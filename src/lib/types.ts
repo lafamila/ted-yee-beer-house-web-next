@@ -10,6 +10,7 @@ export interface Project {
 
 export interface CreateProjectRequest {
   name: string;
+  icon: string;
   isSecret: boolean;
   password?: string;
 }

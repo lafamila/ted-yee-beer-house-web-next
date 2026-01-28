@@ -12,3 +12,17 @@ export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 export const DEFAULT_CODE_LANGUAGE = "typescript";
 
 export const EDITOR_THEME = "vs-dark";
+export const AllIcons = [
+  "Beer",
+  "Cake",
+  "Flash",
+  "IceCream",
+  "Idea",
+  "King",
+  "Mountain",
+  "Nut",
+  "Pizza",
+  "Plant",
+  "Radio",
+  "Skull",
+];
