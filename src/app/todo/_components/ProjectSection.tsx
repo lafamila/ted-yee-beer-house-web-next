@@ -1,4 +1,4 @@
-import type { Project } from '@/lib/types';
+import type { ProjectInterface } from '@/lib/types';
 import { useApp } from "@/contexts/AppContext";
 import { Modal } from '@/components/ui/Modal';
 import { useState } from "react";
@@ -18,7 +18,7 @@ export default function ProjectSection() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [pendingProject, setPendingProject] = useState<Project | null>(null);
+  const [pendingProject, setPendingProject] = useState<ProjectInterface | null>(null);
 
   // Create Project Modal State
   const [projectName, setProjectName] = useState('');
@@ -29,7 +29,7 @@ export default function ProjectSection() {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const handleProjectClick = async (project: Project) => {
+  const handleProjectClick = async (project: ProjectInterface) => {
     if (project.isSecret) {
       setPendingProject(project);
       setShowPasswordModal(true);

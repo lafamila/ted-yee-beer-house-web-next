@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/Input";
 import { useApp } from "@/contexts/AppContext";
 import { SORT_OPTIONS } from "@/lib/constants";
-import { Memo } from "@/lib/types";
+import { MemoInterface } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { MemoSection } from "./MemoSection";
@@ -49,7 +49,7 @@ export default function MemoListSection() {
     }
   };
 
-  const handleMemoClick = (memo: Memo, e: React.MouseEvent) => {
+  const handleMemoClick = (memo: MemoInterface, e: React.MouseEvent) => {
     // Ctrl (또는 Cmd) 키를 누른 채로 클릭하면 링크 텍스트 생성
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
@@ -119,7 +119,7 @@ export default function MemoListSection() {
                 위에서 새 메모를 만들어보세요.
               </div>
             ) : (
-              sortedMemos.map((memo: Memo) => (
+              sortedMemos.map((memo: MemoInterface) => (
                 <div
                   key={memo.id}
                   onClick={(e) => handleMemoClick(memo, e)}

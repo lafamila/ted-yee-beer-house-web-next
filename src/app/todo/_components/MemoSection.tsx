@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { MonacoCodeEditor } from '@/components/editor/MonacoCodeEditor';
 import { CheckboxItem } from '@/components/editor/CheckboxItem';
 import { parseContent, toggleCheckbox } from '@/lib/utils';
-import type { ContentBlock } from '@/lib/types';
+import type { ContentBlockInterface } from '@/lib/types';
 
 const isTypingContext = (el: Element | null) => {
   if (!el) return false;
@@ -392,7 +392,7 @@ export function MemoSection() {
   );
 
   const renderContent = () => {
-    const blocks = parseContent(content) as ContentBlock[];
+    const blocks = parseContent(content) as ContentBlockInterface[];
     let codeBlockIndex = 0;
 
     return blocks.map((block, index) => {
