@@ -1,10 +1,12 @@
 'use client';
-import MainPage from "./_components/MainPage";
+import MemoListSection from "./_components/MemoListSection";
+import ProjectSection from "./_components/ProjectSection";
 
 export default function HomePage() {
   return (
     <div className="min-h-screen">
-      <MainPage/>
+      <ProjectSection/>
+      <MemoListSection/>
     </div>
   );
 }
