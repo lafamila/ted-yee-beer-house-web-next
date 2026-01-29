@@ -26,3 +26,5 @@ export const AllIcons = [
   "Radio",
   "Skull",
 ];
+
+export const GAME_TILE = 32;

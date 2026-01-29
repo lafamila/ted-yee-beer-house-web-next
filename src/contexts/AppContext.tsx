@@ -9,16 +9,16 @@ import {
   type ReactNode,
 } from 'react';
 import type {
-  AppState,
-  AppContextType,
-  Project,
-  Memo,
-  CreateProjectRequest,
+  TodoAppStateInterface,
+  TodoAppContextTypeInterface,
+  ProjectInterface,
+  MemoInterface,
+  CreateProjectRequestInterface,
   SortOption,
 } from '@/lib/types';
 import * as api from '@/lib/api';
 
-const initialState: AppState = {
+const initialState: TodoAppStateInterface = {
   selectedProject: null,
   selectedMemo: null,
   projects: [],
@@ -29,10 +29,10 @@ const initialState: AppState = {
   error: null,
 };
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const AppContext = createContext<TodoAppContextTypeInterface | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(initialState);
+  const [state, setState] = useState<TodoAppStateInterface>(initialState);
 
 
   const loadProjects = async () => {
@@ -55,7 +55,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Project Actions
-  const selectProject = useCallback(async (project: Project) => {
+  const selectProject = useCallback(async (project: ProjectInterface) => {
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
@@ -79,7 +79,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createProject = useCallback(
-    async (data: CreateProjectRequest) => {
+    async (data: CreateProjectRequestInterface) => {
       try {
         setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
@@ -122,7 +122,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   // Memo Actions
-  const selectMemo = useCallback(async (memo: Memo) => {
+  const selectMemo = useCallback(async (memo: MemoInterface) => {
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
@@ -249,7 +249,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     openMemoFromUrl();
   }, [state.projects, selectProject, selectMemo]);
 
-  const value: AppContextType = {
+  const value: TodoAppContextTypeInterface = {
     state,
     selectProject,
     createProject,
@@ -263,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
-export function useApp(): AppContextType {
+export function useApp(): TodoAppContextTypeInterface {
   const context = useContext(AppContext);
   if (context === undefined) {
     throw new Error('useApp must be used within an AppProvider');
