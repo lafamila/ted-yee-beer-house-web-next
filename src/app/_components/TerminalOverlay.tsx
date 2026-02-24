@@ -32,11 +32,11 @@ const TerminalOverlay = ({ isOpen, onClose }: TerminalOverlayProps) => {
         >
           <Terminal
             ref={terminalRef}
-            prompt="guest@portfolio:~"
+            prompt="guest@ted-yee-beer-house"
             height="100%"
             className="h-full"
             welcomeMessages={[
-              "Welcome to AlexDev Portfolio v2.4.0",
+              "Welcome to Teddy's Terminal v1.0.0",
               "Type 'help' for a list of commands.",
             ]}
             onExit={onClose}
@@ -64,7 +64,7 @@ const TerminalOverlay = ({ isOpen, onClose }: TerminalOverlayProps) => {
                     "clear                   Clear the screen",
                     "echo [text]             Print text",
                     "date                    Print current date",
-                    "whoami                  Print prompt name",
+                    "whoami                  Who am I?",
                     "ping                    pong",
                     "sum [num1] [num2] ...   Sum numbers",
                     "game                    Go to game page",

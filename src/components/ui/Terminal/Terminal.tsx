@@ -2,7 +2,7 @@
 
 import { CommandLine, ReadRequestInterface, TerminalHandler, TerminalProps } from "@/lib/types";
 import { cn, tokenizeCommandLine } from "@/lib/utils";
-import { ChevronRight, Terminal as TerminalIcon } from "lucide-react";
+import { Terminal as TerminalIcon } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 function TerminalComponent(
@@ -15,7 +15,7 @@ function TerminalComponent(
     onCommand,
     onExit,
     headerControls,
-    height = "100%",
+    // height kept in interface for API compatibility; flex layout handles sizing internally
     className,
   }: TerminalProps,
   ref: React.Ref<TerminalHandler>
@@ -81,7 +81,7 @@ function TerminalComponent(
         "clear                   Clear the screen",
         "echo [text]             Print text",
         "date                    Print current date",
-        "whoami                  Print prompt name",
+        "whoami                  Who am I?",
       ],
       clear: () => {
         setLines([]);
@@ -89,7 +89,7 @@ function TerminalComponent(
       },
       echo: (...xs: string[]) => xs.join(" ") || "",
       date: () => new Date().toString(),
-      whoami: () => prompt ?? "terminal",
+      whoami: () => ["teddy", "lafamila", "Kyoungmin Lee"][Math.floor(Math.random() * 3)],
     };
     if (onExit) {
       fns.exit = () => {
@@ -98,7 +98,7 @@ function TerminalComponent(
       };
     }
     return fns;
-  }, [prompt, onExit]);
+  }, [onExit]);
 
   const runCommand = useCallback(async (cmdLine: string) => {
     const trimmedCommand = cmdLine.trim();
@@ -246,12 +246,9 @@ function TerminalComponent(
         ))}
 
         <div className="flex items-center gap-2 text-white">
-          <ChevronRight
-            className={cn(
-              "w-4 h-4 text-[#3994ef] select-none flex-shrink-0",
-              readRequest?.isSecret ? "invisible" : ""
-            )}
-          />
+          {!readRequest?.isSecret && (
+            <span className="text-gray-400 select-none flex-shrink-0 whitespace-nowrap">{prompt}$</span>
+          )}
           <input
             ref={inputRef}
             value={userInput}
@@ -261,7 +258,7 @@ function TerminalComponent(
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
-            className="flex-1 bg-transparent border-none outline-none focus:ring-0 placeholder-gray-600 caret-[#3994ef]"
+            className="flex-1 bg-transparent border-none outline-none focus:ring-0 placeholder-gray-600 caret-gray-400"
           />
         </div>
       </div>
