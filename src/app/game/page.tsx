@@ -1,7 +1,7 @@
 "use client";
 import { GameAPIInterface, TerminalHandler } from "@/lib/types";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal } from "@/components/ui/Terminal";
 import { GAME_TILE } from "@/lib/constants";
 
@@ -14,6 +14,9 @@ export default function GamePage() {
   const [mounted, setMounted] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
 
+  const handleReady = useCallback((api: GameAPIInterface) => {
+    gameRef.current = api;
+  }, []);
   useEffect(() => {
     const timer = setTimeout(() => {
       setMounted(true);
@@ -54,7 +57,7 @@ export default function GamePage() {
           // style={{ width: 32 * 10, height: 32 * 8, margin: "0 auto" }}
           style={{ width: "90vw", height: GAME_TILE * 8, margin: "0 auto" }}
           resolution={resolution}
-          onReady={(api) => (gameRef.current = api)}
+          onReady={handleReady}
         />
       </div>
       <div
@@ -62,7 +65,7 @@ export default function GamePage() {
         onClick={() => terminalRef.current?.focus()}>
         <Terminal
           ref={terminalRef}
-          prompt={`${permission}@lafamila-web`}
+          prompt={`${permission}@ted-yee-beer-house`}
           height="100%"
           className="h-full"
           welcomeMessages={[
@@ -71,9 +74,25 @@ export default function GamePage() {
           ]}
           onCommand={async (cmd, args) => {
             if(permission === "admin" || permission === "idiot"){
+              if (cmd === "help") {
+                return [
+                  "help                    Show this help",
+                  "clear                   Clear the screen",
+                  "echo [text]             Print text",
+                  "date                    Print current date",
+                  "whoami                  Who am I?",
+                  "",
+                  "-- Game Commands --",
+                  "tp <gx> <gy>            Teleport player",
+                  "speed [value]            Get/set player speed",
+                  "jump [force]             Make player jump",
+                  "gravity <value>          Set gravity",
+                  "spawn <type> [gx] [gy]   Spawn box or mushroom",
+                  "reset                    Reset the game scene",
+                ];
+              }
               return await gameRef.current?.exec(cmd, args);
-            }
-            else{
+            } else {
               switch (cmd){
                 case "help" : 
                   return [
