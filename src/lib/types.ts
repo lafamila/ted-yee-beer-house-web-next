@@ -30,6 +30,23 @@ export interface ReadRequestInterface extends ReadOptionsInterface {
   reject: (e?: any) => void;
 }
 
+export interface TerminalProps {
+  /** Header prompt name (e.g. "guest@portfolio:~") */
+  prompt?: string;
+  /** Welcome lines shown on mount */
+  welcomeMessages?: string[];
+  /** Consumer-defined command handler — runs BEFORE builtIns */
+  onCommand?: CommandHandler;
+  /** Optional callback when user types 'exit' — if omitted, 'exit' is not registered */
+  onExit?: () => void;
+  /** Optional header controls (e.g. maximize/close buttons) — rendered right side of header */
+  headerControls?: import('react').ReactNode;
+  /** Height of scrollable body — CSS value or number (px). Default: '100%' */
+  height?: number | string;
+  /** Additional CSS class for the outermost container */
+  className?: string;
+}
+
 // Project 관련 타입
 export interface ProjectInterface {
   id: string;
