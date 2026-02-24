@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { Space_Grotesk } from "next/font/google";
 import { AppProvider } from "@/contexts/AppContext";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
 import "./globals.css";
+
+import BackgroundEffect from "@/components/layout/BackgroundEffect";
+
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "TeddyNote - Developer Memo App",
@@ -16,7 +19,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="antialiased">
+      <body className={`${spaceGrotesk.className} antialiased font-sans min-h-screen bg-black text-white selection:bg-[#3994ef] selection:text-white relative`}>
+        <BackgroundEffect />
         <AppProvider>
           {children}
           {/* <Header /> */}

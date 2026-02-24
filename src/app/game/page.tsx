@@ -2,7 +2,8 @@
 import { GameAPIInterface, TerminalHandler } from "@/lib/types";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import Terminal from "./_components/TerminalSection";
+import { Terminal } from "@/components/ui/Terminal";
+import { GAME_TILE } from "@/lib/constants";
 
 const GamePlaySection = dynamic(() => import("./_components/GamePlaySection"), { ssr: false });
 export default function GamePage() {
@@ -10,31 +11,60 @@ export default function GamePage() {
   const gameRef = useRef<GameAPIInterface | null>(null);
   const wrongPasswordCountRef = useRef(0);
   const [permission, setPermission] = useState("guest");
-  useEffect(() => {
-  if (permission === "admin" ) {
-    void terminalRef.current?.print(["Welcome, Admin! ... but who are you, really?", "Try 'help' ... if you’re recognized."]);
-  }
-  else if (permission === "idiot") {
-    void terminalRef.current?.print(["Welcome, Idiot! Such impressive confidence.", "Try 'help'. You’ll need it more than most."]);
-  }
-}, [permission]);
-  return (
+  const [mounted, setMounted] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(0);
 
-    <div>
-      <GamePlaySection
-        // style={{ width: 32 * 10, height: 32 * 8, margin: "0 auto" }}
-        style={{ width: "100vw", height: 32 * 8, margin: "0 auto" }}
-        resolution={{ width: 32 * 10, height: 32 * 8 }}
-        onReady={(api) => (gameRef.current = api)}
-      />{" "}
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted(true);
+      setWindowWidth(window.innerWidth);
+    }, 0);
+
+    const onResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (permission === "admin") {
+      void terminalRef.current?.print(["Welcome, Admin! ... but who are you, really?", "Try 'help' ... if you’re recognized."]);
+    }
+    else if (permission === "idiot") {
+      void terminalRef.current?.print(["Welcome, Idiot! Such impressive confidence.", "Try 'help'. You’ll need it more than most."]);
+    }
+  }, [permission]);
+
+  if (!mounted) return null;
+
+  const resolution = {
+    width: Math.floor(windowWidth / GAME_TILE) * GAME_TILE,
+    height: GAME_TILE * 8
+  };
+
+  return (
+    <div className="flex flex-col h-screen">
+      <div className="flex-none">
+        <GamePlaySection
+          // style={{ width: 32 * 10, height: 32 * 8, margin: "0 auto" }}
+          style={{ width: "90vw", height: GAME_TILE * 8, margin: "0 auto" }}
+          resolution={resolution}
+          onReady={(api) => (gameRef.current = api)}
+        />
+      </div>
       <div
-        className="p-6 h-[80vh] terminal"
+        className="flex-1 min-h-0"
         onClick={() => terminalRef.current?.focus()}>
         <Terminal
           ref={terminalRef}
-          title=""
           prompt={`${permission}@lafamila-web`}
           height="100%"
+          className="h-full"
           welcomeMessages={[
             "Welcome to the Terminal!",
             "Type 'help' to see available commands.",
@@ -42,7 +72,6 @@ export default function GamePage() {
           onCommand={async (cmd, args) => {
             if(permission === "admin" || permission === "idiot"){
               return await gameRef.current?.exec(cmd, args);
-
             }
             else{
               switch (cmd){

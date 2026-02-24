@@ -22,7 +22,6 @@ export function MemoSection() {
   const {
     state: { selectedMemo, selectedProject, memos },
     updateMemo,
-    selectMemo,
   } = useApp();
   const [showTextarea, setShowTextarea] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -75,7 +74,6 @@ export function MemoSection() {
   const [showMemoSearch, setShowMemoSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchPosition, setSearchPosition] = useState<{ top: number; left: number } | null>(null);
-  const [cursorPosition, setCursorPosition] = useState<number>(0);
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -166,7 +164,6 @@ export function MemoSection() {
         if (textareaRef.current) {
           textareaRef.current.focus();
           textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-          setCursorPosition(newCursorPos);
         }
       }, 0);
     },
@@ -232,7 +229,7 @@ export function MemoSection() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleSaveMemo]);
+  }, [handleSaveMemo, showTextarea]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
@@ -240,8 +237,6 @@ export function MemoSection() {
 
     setContent(newContent);
     contentRef.current = newContent;
-
-    setCursorPosition(cursorPos);
 
     const textBeforeCursor = newContent.substring(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
@@ -354,15 +349,6 @@ export function MemoSection() {
     }
   }, []);
 
-  const handleMemoLinkClick = useCallback(
-    async (memoId: string) => {
-      const targetMemo = memos.find((m) => m.id === memoId);
-      if (targetMemo) {
-        await selectMemo(targetMemo);
-      }
-    },
-    [memos, selectMemo]
-  );
 
   const markdownComponents = React.useMemo(
     () => ({

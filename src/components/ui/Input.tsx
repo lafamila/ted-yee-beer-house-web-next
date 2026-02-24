@@ -1,5 +1,3 @@
-import { cn } from '@/lib/utils';
-
 export interface InputProps {
   type?: 'text' | 'password';
   value: string;

@@ -8,6 +8,9 @@ interface GamePlaySectionProps {
   onReady?: (api: GameAPIInterface) => void;
 }
 
+//원래 player 는 일반인이었다가, 튜토리얼 겸 움직이다가 박스에서 노트북을 얻어 개발자가 되면 terminal 이 보이는 구조?
+//admin / idiot / guest 일때 생김새가 다 다르고, 할수있는 명령어도 다르게
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ensureAnim(spr: any, name: "idle" | "run" | "jump") {
   if (spr.currentAnim !== name) {
@@ -80,10 +83,10 @@ export default function GamePlaySection({
       // load sprites
       await Promise.all([
         loadSprite("player", "/sprites/player.png", {
-          sliceX: 4,
+          sliceX: 8,
           anims: {
-            idle: { from: 0, to: 1, loop: true, speed: 4 },
-            run: { from: 2, to: 3, loop: true, speed: 4 },
+            idle: { from: 0, to: 3, loop: true, speed: 4 },
+            run: { from: 4, to: 7, loop: true, speed: 4 },
             jump: 2,
           },
         }),
@@ -104,11 +107,11 @@ export default function GamePlaySection({
 
       // define scene
       scene("game", () => {
-        for (let i = 0; i < width; i += 3) {
+        for (let i = 0; i < width; i += 7) {
           add([
             sprite("cloud", { anim: "idle" }),
             pos(...xy(i, (i % 2) + 1)),
-            scale(1),
+            scale(2.0),
             anchor("center"),
             "cloud",
           ]);
@@ -117,9 +120,9 @@ export default function GamePlaySection({
         for (let i = 0; i < width; i++) {
           add([
             sprite("ground"),
-            pos(...xy(i + 0.5, height - 0.5)),
+            pos(...xy(i + 0.5, height - 1)),
             anchor("center"),
-            scale(1),
+            scale(1.0),
             area(),
             body({ isStatic: true }),
             "ground",
@@ -131,6 +134,7 @@ export default function GamePlaySection({
           pos(...xy(width / 2, 1.5)),
           anchor("center"),
           area(),
+          scale(2.0),
           body({ isStatic: true }),
           "box",
         ]);
@@ -272,7 +276,7 @@ export default function GamePlaySection({
       kRef.current = null;
       isInitializedRef.current = false;
     };
-  }, [resolution.width, resolution.height])
+  }, [resolution.width, resolution.height, onReady, width, height])
 
   return (
     <div

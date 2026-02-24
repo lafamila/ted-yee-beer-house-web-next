@@ -40,7 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
       const projects = await api.getAllProjects();
       setState((prev) => ({ ...prev, projects, isLoading: false }));
-    } catch (error) {
+     } catch {
       setState((prev) => ({
         ...prev,
         error: '프로젝트 목록을 불러오는데 실패했습니다.',
@@ -69,7 +69,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedMemo: null, // 프로젝트 변경 시 선택된 메모 초기화
         isLoading: false,
       }));
-    } catch (error) {
+     } catch {
       setState((prev) => ({
         ...prev,
         error: '메모 목록을 불러오는데 실패했습니다.',
@@ -93,7 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // 새로 생성한 프로젝트 자동 선택
         await selectProject(newProject);
-      } catch (error) {
+       } catch (error) {
         setState((prev) => ({
           ...prev,
           error: '프로젝트 생성에 실패했습니다.',
@@ -110,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const verified = await api.verifyPassword(projectId, password);
         return verified;
-      } catch (error) {
+       } catch {
         setState((prev) => ({
           ...prev,
           error: '비밀번호 검증에 실패했습니다.',
@@ -134,7 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedMemo: fullMemo,
         isLoading: false,
       }));
-    } catch (error) {
+     } catch {
       setState((prev) => ({
         ...prev,
         error: '메모를 불러오는데 실패했습니다.',
@@ -169,7 +169,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // 새로 생성한 메모 자동 선택
         await selectMemo(newMemo);
-      } catch (error) {
+       } catch (error) {
         setState((prev) => ({
           ...prev,
           error: '메모 생성에 실패했습니다.',
@@ -201,7 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             memo.id === updatedMemo.id ? updatedMemo : memo
           ),
         }));
-      } catch (error) {
+       } catch (error) {
         setState((prev) => ({
           ...prev,
           error: '메모 저장에 실패했습니다.',
@@ -238,7 +238,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               if (memo) {
                 await selectMemo(memo);
               }
-            } catch (error) {
+             } catch (error) {
               console.error('Failed to load memo from URL:', error);
             }
           }, 100);
@@ -247,7 +247,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     openMemoFromUrl();
-  }, [state.projects, selectProject, selectMemo]);
+  }, [state.projects, state.selectedProject, selectProject, selectMemo]);
 
   const value: TodoAppContextTypeInterface = {
     state,
