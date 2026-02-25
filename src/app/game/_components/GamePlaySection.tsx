@@ -6,6 +6,7 @@ interface GamePlaySectionProps {
   resolution?: {width: number; height: number};
   style?: React.CSSProperties;
   onReady?: (api: GameAPIInterface) => void;
+  setPermission?: React.Dispatch<React.SetStateAction<string>>;
 }
 
 //원래 player 는 일반인이었다가, 튜토리얼 겸 움직이다가 박스에서 노트북을 얻어 개발자가 되면 terminal 이 보이는 구조?
@@ -23,6 +24,7 @@ export default function GamePlaySection({
   resolution = { width: 512, height: 288 },
   style,
   onReady,
+  setPermission,
 }: GamePlaySectionProps) {
   const playSectionRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +32,7 @@ export default function GamePlaySection({
   const isInitializedRef = useRef(false);
   const height = Math.floor(resolution.height / GAME_TILE);
   const width = Math.floor(resolution.width / GAME_TILE);
+  console.log("GamePlaySection rendered with resolution", resolution, "=> grid size", width, "x", height);
   const xy = (x: number, y: number) => [x * GAME_TILE, y * GAME_TILE] as const;
 
   useEffect(() => {
@@ -74,15 +77,31 @@ export default function GamePlaySection({
         onKeyPress,
         onUpdate,
         setGravity,
+        destroy,
         Rect,
         Vec2,
         vec2,
+        text,
+        rect,
+        color,
+        follow,
+        wait,
+        opacity,
+        z,
       } = k;
       setGravity(2000);
       
       // load sprites
       await Promise.all([
         loadSprite("player", "/sprites/player.png", {
+          sliceX: 8,
+          anims: {
+            idle: { from: 0, to: 3, loop: true, speed: 4 },
+            run: { from: 4, to: 7, loop: true, speed: 4 },
+            jump: 2,
+          },
+        }),
+        loadSprite("player_sudo", "/sprites/player.png", {
           sliceX: 8,
           anims: {
             idle: { from: 0, to: 3, loop: true, speed: 4 },
@@ -103,6 +122,10 @@ export default function GamePlaySection({
           sliceY: 2,
           anims: { idle: { from: 0, to: 1, loop: true, speed: 8 } },
         }),
+        loadSprite("notebook", "/sprites/notebook.png", {
+          sliceX: 8,
+          anims: { idle: { from: 0, to: 7, loop: true, speed: 4 } },
+        }),
       ]);
 
       // define scene
@@ -120,9 +143,9 @@ export default function GamePlaySection({
         for (let i = 0; i < width; i++) {
           add([
             sprite("ground"),
-            pos(...xy(i + 0.5, height - 1)),
+            pos(...xy(i, height-1)),
             anchor("center"),
-            scale(1.0),
+            scale(1.5),
             area(),
             body({ isStatic: true }),
             "ground",
@@ -131,23 +154,33 @@ export default function GamePlaySection({
 
         add([
           sprite("box", { anim: "idle" }),
-          pos(...xy(width / 2, 1.5)),
-          anchor("center"),
+          pos(...xy(width / 2, height-8)),
+          anchor("bot"),
           area(),
           scale(2.0),
           body({ isStatic: true }),
           "box",
         ]);
 
+        add([
+          sprite("notebook", { anim: "idle" }),
+          pos(...xy(width * 1 / 3, height-4)),
+          anchor("center"),
+          area({ shape: new Rect(new Vec2(0), 60, 120), offset: vec2(0, 0) }),
+          scale(0.5),
+          body({ isStatic: true }),
+          "notebook",
+        ]);
+
         const player = add([
           sprite("player", { anim: "idle" }),
           pos(...xy(0.5, 1)),
           anchor("center"),
-          area({ shape: new Rect(new Vec2(0), 32, 50), offset: vec2(0, -2) }),
+          area({ shape: new Rect(new Vec2(0), 40, 100), offset: vec2(0, 8) }),
           body(),
           scale(1),
           "player",
-          { speed: 160, canDouble: false },
+          { speed: 160, canDouble: false, permission: "guest" },
         ]);
 
         onKeyDown("left", () => {
@@ -180,6 +213,14 @@ export default function GamePlaySection({
           if (!hitFromBelow) return;
           b.frame = 2;
           if (player.vel.y < 0) player.vel.y = 180;
+        });
+
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        player.onCollide("notebook", (b: any) => {
+          setPermission?.("guest");
+          player.use(sprite("player_sudo", { anim: "idle" }));
+          destroy(b);
         });
 
         const api: GameAPIInterface = {
@@ -239,7 +280,8 @@ export default function GamePlaySection({
                     sprite("mushroom", { anim: "idle" }),
                     pos(...xy(gx, gy)),
                     anchor("center"),
-                    area(),
+                    scale(1.7),
+                    area({ shape: new Rect(new Vec2(0), 32, 27), offset: vec2(0, 1) }),
                     body(),
                     "mushroom",
                   ]);
@@ -255,6 +297,50 @@ export default function GamePlaySection({
               default:
                 return undefined; // Terminal이 builtins로 폴백
             }
+          },
+          showBubble: () => {
+            // 이전 말풍선이 있으면 제거
+            k.destroyAll("bubble");
+
+            // 말풍선 배경 (흰색 둥근 사각형)
+            const bubbleBg = add([
+              rect(32, 28, { radius: 6 }),
+              color(255, 255, 255),
+              anchor("bot"),
+              pos(0, 0),
+              follow(player, vec2(20, -50)),
+              opacity(0.95),
+              z(100),
+              "bubble",
+            ]);
+
+            // "?" 텍스트
+            add([
+              text("?", { size: 20 }),
+              color(0, 0, 0),
+              anchor("center"),
+              pos(0, 0),
+              follow(bubbleBg, vec2(0, -14)),
+              z(101),
+              "bubble",
+            ]);
+
+            // 말풍선 꼬리 (작은 삼각형 대용 — 작은 사각형)
+            add([
+              rect(8, 8, { radius: 2 }),
+              color(255, 255, 255),
+              anchor("top"),
+              pos(0, 0),
+              follow(player, vec2(20, -22)),
+              opacity(0.95),
+              z(99),
+              "bubble",
+            ]);
+
+            // 2초 후 자동 제거
+            wait(2, () => {
+              k.destroyAll("bubble");
+            });
           },
         };
 

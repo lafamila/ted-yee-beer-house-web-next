@@ -10,6 +10,7 @@ export type CommandHandler = (cmd: string, args: string[]) => CommandResult;
 
 export type GameAPIInterface = {
   exec: CommandHandler;
+  showBubble: () => void;
 };
 
 export type TerminalHandler = {
