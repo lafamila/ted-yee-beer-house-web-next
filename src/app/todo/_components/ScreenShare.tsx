@@ -217,9 +217,12 @@ export default function ScreenShare() {
       shareRoomRef.current = room;
 
       await room.connect(LIVEKIT_URL, token);
+      console.log('[ScreenShare] room connected, enabling screen share...');
       await room.localParticipant.setScreenShareEnabled(true);
+      console.log('[ScreenShare] screen share enabled');
       startShare();
-    } catch {
+    } catch (err) {
+      console.error('[ScreenShare] handleStartShare error:', err);
       shareRoomRef.current?.disconnect();
       shareRoomRef.current = null;
     } finally {
