@@ -247,7 +247,7 @@ export default function MemoListSection() {
     <>
     <div className="content">
       <div className="main-container">
-        <div className="title-container flex items-center gap-2">
+        <div className="title-container">
           <span>{selectedProject.name}</span>
           <div id="screen-share-buttons" />
         </div>
