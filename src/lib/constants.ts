@@ -3,6 +3,9 @@ import type { SortOption } from "./types";
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3031/api/todo";
 
+export const LIVEKIT_URL =
+  process.env.NEXT_PUBLIC_LIVEKIT_URL || 'ws://localhost:7880';
+
 export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "created", label: "생성순" },
   { value: "name", label: "이름순" },

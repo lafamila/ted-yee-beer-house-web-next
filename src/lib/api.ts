@@ -377,3 +377,14 @@ export async function changePassword(
 
   return response.json();
 }
+
+export async function getLiveKitToken(roomName: string): Promise<{ token: string }> {
+  const res = await fetch(`${API_BASE_URL}/livekit/token`, {
+    method: 'POST',
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ roomName }),
+  });
+
+  if (!res.ok) throw new Error('Failed to get LiveKit token');
+  return res.json();
+}

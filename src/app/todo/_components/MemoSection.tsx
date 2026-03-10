@@ -592,7 +592,7 @@ export function MemoSection() {
           )}
         </div>
 
-        <div className="overflow-hidden flex flex-col h-full min-h-0">
+        <div className="flex flex-col h-full min-h-0">
           
 
           <div className={`w-full min-h-0 transition-all p-0 duration-300 ${showTextarea ? 'h-2/3' : 'h-full'} overflow-y-auto prose prose-sm max-w-none text-white`} onDoubleClick={openTextarea}>
