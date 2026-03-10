@@ -10,7 +10,7 @@ export type CommandHandler = (cmd: string, args: string[]) => CommandResult;
 
 export type GameAPIInterface = {
   exec: CommandHandler;
-  showBubble: () => void;
+  showBubble: (text: string) => void;
 };
 
 export type TerminalHandler = {
@@ -54,6 +54,7 @@ export interface ProjectInterface {
   name: string;
   icon: string;
   isSecret: boolean;
+  ownerId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,6 +77,7 @@ export interface MemoInterface {
   projectId: string;
   title: string;
   content: string;
+  createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,6 +104,37 @@ export interface ContentBlockInterface {
   };
 }
 
+// Article (게시글) 관련 타입
+export interface ArticleInterface {
+  id: string;
+  memoId: string;
+  projectId: string;
+  title: string;
+  content: string;
+  publishedVersion: number;
+  createdAt: string;
+  publishedAt: string;
+  updatedAt: string;
+  projectName?: string;
+  projectIcon?: string;
+  isSecret?: boolean;
+}
+
+// 목록 조회용 (content 제외)
+export interface ArticleListItemInterface {
+  id: string;
+  memoId: string;
+  projectId: string;
+  title: string;
+  publishedVersion: number;
+  createdAt: string;
+  publishedAt: string;
+  updatedAt: string;
+  projectName?: string;
+  projectIcon?: string;
+  isSecret?: boolean;
+}
+
 // 정렬 타입
 export type SortOption = "created" | "name" | "updated";
 
@@ -115,6 +148,8 @@ export interface TodoAppStateInterface {
   sortOption: SortOption;
   isLoading: boolean;
   error: string | null;
+  selectedMemoIds: string[];
+  members: ProjectMemberInterface[];
 }
 
 // Context 액션 타입
@@ -134,4 +169,37 @@ export interface TodoAppContextTypeInterface {
   createMemo: (title: string) => Promise<void>;
   updateMemo: (content: string) => Promise<void>;
   setSortOption: (option: SortOption) => void;
+  toggleSelectMemo: (memoId: string) => void;
+  clearSelectedMemos: () => void;
+  deleteMemos: (memoIds: string[]) => Promise<void>;
+
+  // Member Actions
+  loadMembers: (projectId: string) => Promise<void>;
+  inviteMember: (projectId: string, userId: string) => Promise<void>;
+  removeMember: (projectId: string, userId: string) => Promise<void>;
+}
+
+// User / Auth 관련 타입
+export interface UserInterface {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
+}
+
+export interface LoginResponseInterface {
+  accessToken: string;
+  tokenType: string;
+  user: UserInterface;
+}
+
+export interface ProjectMemberInterface {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: string;
+  invitedAt: string;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
 }

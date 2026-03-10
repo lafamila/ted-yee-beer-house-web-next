@@ -36,6 +36,7 @@ export function MonacoCodeEditor({
     onChange(value || '');
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEditorDidMount = (editor: any, monaco: any) => {
     // Cmd+S (Mac) or Ctrl+S (Windows/Linux) to save
     if (onSave && monaco) {

@@ -1,20 +1,24 @@
 import type { ProjectInterface } from '@/lib/types';
 import { useApp } from "@/contexts/AppContext";
+import { useAuth } from '@/contexts/AuthContext';
 import { Modal } from '@/components/ui/Modal';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Button } from '@/components/ui/Button';
 import Add from '@/assets/add-icon.svg';
 import Icon from '@/components/ui/Icon';
 import { AllIcons } from '@/lib/constants';
+import * as api from '@/lib/api';
 export default function ProjectSection() {
   const {
-    state: { projects },
+    state: { projects, selectedProject: currentProject },
     selectProject,
     createProject,
     verifyProjectPassword,
-  } = useApp();  
+  } = useApp();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.isAdmin ?? false;
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -28,6 +32,50 @@ export default function ProjectSection() {
   // Password Modal State
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  // Password Change State
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!oldPassword.trim() || !newPassword.trim()) return;
+
+    setIsChangingPassword(true);
+    setPasswordChangeError('');
+    setPasswordChangeSuccess('');
+    try {
+      await api.changePassword(oldPassword, newPassword);
+      setPasswordChangeSuccess('비밀번호가 변경되었습니다.');
+      setOldPassword('');
+      setNewPassword('');
+      setTimeout(() => {
+        setShowPasswordChangeModal(false);
+        setPasswordChangeSuccess('');
+      }, 1500);
+    } catch (error) {
+      setPasswordChangeError(error instanceof Error ? error.message : '비밀번호 변경에 실패했습니다.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  // Keyboard shortcut: Cmd+Shift+X when no project is selected → open create project modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'x') {
+        if (!currentProject && isAdmin) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowCreateModal(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [currentProject, isAdmin]);
 
   const handleProjectClick = async (project: ProjectInterface) => {
     if (project.isSecret) {
@@ -92,31 +140,57 @@ export default function ProjectSection() {
         {projects.map((project) => (
           <div
             key={project.id}
-            className="project flex flex-row items-center"
+            className="project"
             onClick={() => {
               handleProjectClick(project);
             }}>
             <div className="project-icon">
+              {project.isSecret && (
+                <span className='project-secret'>🔒</span>
+              )}
               <Icon icon={project.icon} />
             </div>
-            <div className="project-name flex flex-row justify-between">
+            <div className="project-name">
               <span>{project.name}</span>
-              {project.isSecret && (
-              <span>🔒</span>
-            )}
             </div>
           </div>
         ))}
       </div>
       <div className="left-sidebar-footer">
+        {isAdmin && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="new-project"
+          >
+            <div className="new-project-icon">
+              <Add width="20px" height="20px" />
+            </div>
+            <div className="new-project-label">New Project</div>
+          </button>
+        )}
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={logout}
           className="new-project"
+          style={{ opacity: 0.6 }}
         >
-          <div className="new-project-icon">
-            <Add width="20px" height="20px" />
+          <div className="new-project-label" style={{ fontSize: '12px' }}>
+            {user?.displayName ?? user?.username} · 로그아웃
           </div>
-          <div className="new-project-label">New Project</div>
+        </button>
+        <button
+          onClick={() => {
+            setShowPasswordChangeModal(true);
+            setOldPassword('');
+            setNewPassword('');
+            setPasswordChangeError('');
+            setPasswordChangeSuccess('');
+          }}
+          className="new-project"
+          style={{ opacity: 0.6 }}
+        >
+          <div className="new-project-label" style={{ fontSize: '12px' }}>
+            비밀번호 변경
+          </div>
         </button>
       </div>
     </div>
@@ -212,6 +286,71 @@ export default function ProjectSection() {
             <Button
               variant="secondary"
               onClick={() => setShowPasswordModal(false)}
+            >
+              취소
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Password Change Modal */}
+      <Modal
+        isOpen={showPasswordChangeModal}
+        onClose={() => setShowPasswordChangeModal(false)}
+        title="비밀번호 변경"
+        size="sm"
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleChangePassword();
+          }}
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              기존 비밀번호
+            </label>
+            <Input
+              type="password"
+              value={oldPassword}
+              onChange={setOldPassword}
+              placeholder="기존 비밀번호를 입력하세요"
+              className='w-full outline-none'
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              새 비밀번호
+            </label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={setNewPassword}
+              placeholder="새 비밀번호를 입력하세요"
+              className='w-full outline-none'
+            />
+          </div>
+
+          {passwordChangeError && (
+            <p className="text-sm text-red-600">{passwordChangeError}</p>
+          )}
+          {passwordChangeSuccess && (
+            <p className="text-sm text-green-600">{passwordChangeSuccess}</p>
+          )}
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword}
+            >
+              {isChangingPassword ? '변경 중...' : '변경'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowPasswordChangeModal(false)}
             >
               취소
             </Button>

@@ -156,6 +156,12 @@ body {
   padding-left: 6px;    /* grid-template-columns: 34px 1fr 80px; */
 }
 
+.task-multi-selected {
+  background-color: #fff4f2;
+  border-left: 6px solid #dc2626;
+  padding-left: 6px;
+}
+
 .task-selected>span:first-child {
   padding-left: 14px;
 }
@@ -179,6 +185,7 @@ body {
   width: var(--left-sidebar-width);
   /* width: var(--left-sidebar-width-expanded); */
   background-color: black;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   height: 100vh;
   position: fixed;
   left: 0;
@@ -188,14 +195,11 @@ body {
   grid-template-rows: 80px 1fr 120px;
   grid-template-columns: 1fr;
   align-items: center;
-  justify-content: center;
   color: var(--white);
 }
 
 .left-sidebar>div {
   display: grid;
-  justify-content: center;
-
 }
 
 .left-sidebar:hover {
@@ -206,9 +210,25 @@ body {
 .project {
   cursor: pointer;
   width: 100%;
-  padding: 0px calc((var(--left-sidebar-width) - 20px)/2);
+  padding: 0;
+    display: flex;
+    align-items: center;
 }
 
+.project-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: calc(var(--left-sidebar-width) - 40px);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.project-secret {
+  left: calc(var(--left-sidebar-width) / 2 - 20px);
+  position: absolute;
+  top: -10px;
+}
 .project-icon svg g {
   stroke: var(--white);
 }
@@ -230,6 +250,10 @@ body {
   overflow-y: auto;
   grid-auto-rows: 40px;
   grid-template-columns: 1fr;
+  white-space: nowrap;
+    align-items: center;
+    padding-left: 20px;
+    padding-right: 20px;
 }
 
 .project-container::-webkit-scrollbar {
@@ -240,20 +264,24 @@ body {
   width: 0px;
   /* padding-left: 10px;
   width: calc(var(--left-sidebar-width-expanded) - var(--left-sidebar-width)); */
+  /* display: none; */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition-duration: 500ms;
+  transition-duration: 0.5s;
 }
 
 .left-sidebar:hover .project-name {
   padding-left: 10px;
-  width: calc(var(--left-sidebar-width-expanded) - var(--left-sidebar-width));
+  display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    width: calc(var(--left-sidebar-width-expanded) - var(--left-sidebar-width) - 40px);
+    transition-duration: 0.5s;
 }
 
 .left-sidebar-footer {
   border-top: 1px solid #333;
-  margin: 0px 10px;
   padding-top: 10px;
   grid-template-rows: 1fr;
   grid-template-columns: 1fr;

@@ -49,7 +49,7 @@ export default function GamePage() {
 
   const handleTerminalButtonClick = useCallback(() => {
     if (permission === "anonymous") {
-      gameRef.current?.showBubble();
+      gameRef.current?.showBubble("?");
     } else {
       setIsTerminalOpen((prev) => !prev);
     }
@@ -69,6 +69,7 @@ export default function GamePage() {
         style={{ width: resolution.width, height: resolution.height, margin: "0 auto" }}
         resolution={resolution}
         onReady={handleReady}
+        permission={permission}
         setPermission={setPermission}
       />
 

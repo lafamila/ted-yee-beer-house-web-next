@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface InputProps {
   type?: 'text' | 'password';
   value: string;
@@ -6,6 +8,9 @@ export interface InputProps {
   disabled?: boolean;
   className?: string;
   autoFocus?: boolean;
+  autoComplete?: string;
+  name?: string;
+  ref?: React.Ref<HTMLInputElement>;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onKeyUp?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
@@ -18,6 +23,9 @@ export function Input({
   disabled = false,
   className,
   autoFocus = false,
+  autoComplete,
+  name,
+  ref,
   onKeyDown,
   onKeyUp,
 }: InputProps) {
@@ -27,6 +35,7 @@ export function Input({
 
   return (
     <input
+      ref={ref}
       type={type}
       value={value}
       onChange={handleInputChange}
@@ -35,6 +44,8 @@ export function Input({
       placeholder={placeholder}
       disabled={disabled}
       autoFocus={autoFocus}
+      autoComplete={autoComplete}
+      name={name}
       className={className}
     />
   );

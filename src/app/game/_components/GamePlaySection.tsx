@@ -6,6 +6,7 @@ interface GamePlaySectionProps {
   resolution?: {width: number; height: number};
   style?: React.CSSProperties;
   onReady?: (api: GameAPIInterface) => void;
+  permission: string;
   setPermission?: React.Dispatch<React.SetStateAction<string>>;
 }
 
@@ -24,6 +25,7 @@ export default function GamePlaySection({
   resolution = { width: 512, height: 288 },
   style,
   onReady,
+  permission,
   setPermission,
 }: GamePlaySectionProps) {
   const playSectionRef = useRef<HTMLDivElement>(null);
@@ -122,9 +124,9 @@ export default function GamePlaySection({
           sliceY: 2,
           anims: { idle: { from: 0, to: 1, loop: true, speed: 8 } },
         }),
-        loadSprite("notebook", "/sprites/notebook.png", {
-          sliceX: 8,
-          anims: { idle: { from: 0, to: 7, loop: true, speed: 4 } },
+        loadSprite("notebook", "/sprites/notebook2.png", {
+          sliceX: 2,
+          anims: { idle: { from: 0, to: 1, loop: true, speed: 2 } },
         }),
       ]);
 
@@ -161,16 +163,17 @@ export default function GamePlaySection({
           body({ isStatic: true }),
           "box",
         ]);
-
-        add([
-          sprite("notebook", { anim: "idle" }),
-          pos(...xy(width * 1 / 3, height-4)),
-          anchor("center"),
-          area({ shape: new Rect(new Vec2(0), 60, 120), offset: vec2(0, 0) }),
-          scale(0.5),
-          body({ isStatic: true }),
-          "notebook",
-        ]);
+        if(permission === "anonymous"){
+          add([
+            sprite("notebook", { anim: "idle" }),
+            pos(...xy(width * 1 / 3, height-4)),
+            anchor("center"),
+            area({ shape: new Rect(new Vec2(0), 60, 120), offset: vec2(0, 0) }),
+            scale(0.5),
+            body({ isStatic: true }),
+            "notebook",
+          ]);
+        }
 
         const player = add([
           sprite("player", { anim: "idle" }),
@@ -298,7 +301,7 @@ export default function GamePlaySection({
                 return undefined; // Terminal이 builtins로 폴백
             }
           },
-          showBubble: () => {
+          showBubble: (_text: string) => {
             // 이전 말풍선이 있으면 제거
             k.destroyAll("bubble");
 
@@ -316,7 +319,7 @@ export default function GamePlaySection({
 
             // "?" 텍스트
             add([
-              text("?", { size: 20 }),
+              text(_text, { size: 20 }),
               color(0, 0, 0),
               anchor("center"),
               pos(0, 0),

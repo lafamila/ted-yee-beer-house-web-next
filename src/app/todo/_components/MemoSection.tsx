@@ -2,13 +2,16 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { MonacoCodeEditor } from '@/components/editor/MonacoCodeEditor';
 import { CheckboxItem } from '@/components/editor/CheckboxItem';
 import { parseContent, toggleCheckbox } from '@/lib/utils';
-import type { ContentBlockInterface } from '@/lib/types';
+import type { ContentBlockInterface, ArticleInterface } from '@/lib/types';
+import { publishArticle, getMemoArticle, deleteArticle } from '@/lib/api';
+import { useMemoSocket } from '@/hooks/useMemoSocket';
 
 const isTypingContext = (el: Element | null) => {
   if (!el) return false;
@@ -23,8 +26,40 @@ export function MemoSection() {
     state: { selectedMemo, selectedProject, memos },
     updateMemo,
   } = useApp();
+  const { user } = useAuth();
+  const isAdmin = user?.isAdmin ?? false;
   const [showTextarea, setShowTextarea] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [lockMessage, setLockMessage] = useState<string | null>(null);
+  const isLockedByOtherRef = useRef(false);
+
+  const {
+    lockHolder,
+    requestLock,
+    releaseLock,
+    broadcastUpdate,
+  } = useMemoSocket({
+    memoId: selectedMemo?.id ?? null,
+    onContentUpdated: (newContent: string) => {
+      setContent(newContent);
+      contentRef.current = newContent;
+      setOriginalContent(newContent);
+      originalContentRef.current = newContent;
+    },
+    onLocked: (info) => {
+      // Another user locked the memo
+      isLockedByOtherRef.current = true;
+      setLockMessage(`${info.displayName}님이 수정중입니다`);
+    },
+    onUnlocked: () => {
+      isLockedByOtherRef.current = false;
+      setLockMessage(null);
+    },
+    onLockDenied: (displayName: string) => {
+      setLockMessage(`${displayName}님이 수정중입니다`);
+      setShowTextarea(false);
+    },
+  });
 
   const focusTextareaToEnd = () => {
     requestAnimationFrame(() => {
@@ -38,6 +73,11 @@ export function MemoSection() {
   };
 
   const openTextarea = () => {
+    // If locked by another user, don't open
+    if (isLockedByOtherRef.current || lockHolder) {
+      return;
+    }
+    requestLock();
     setShowTextarea(true);
     resetTimer();
     focusTextareaToEnd();
@@ -48,6 +88,7 @@ export function MemoSection() {
     }
 
     timeoutRef.current = setTimeout(() => {
+      releaseLock();
       setShowTextarea(false);
     }, 6_000);
   };
@@ -80,6 +121,11 @@ export function MemoSection() {
   const contentRef = useRef<string>('');
   const originalContentRef = useRef<string>('');
 
+  // Article (게시) 관련 상태
+  const [articleStatus, setArticleStatus] = useState<ArticleInterface | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishMessage, setPublishMessage] = useState<string | null>(null);
+
   const filteredMemos = memos
     .filter((memo) => memo.id !== selectedMemo?.id)
     .filter((memo) =>
@@ -96,7 +142,21 @@ export function MemoSection() {
       setOriginalContent(selectedMemo.content);
       contentRef.current = selectedMemo.content;
       originalContentRef.current = selectedMemo.content;
+      setShowTextarea(false);
+      setLockMessage(null);
+      isLockedByOtherRef.current = false;
     }
+  }, [selectedMemo]);
+
+  // 현재 메모의 게시 상태 확인
+  useEffect(() => {
+    if (!selectedMemo) {
+      setArticleStatus(null);
+      return;
+    }
+    getMemoArticle(selectedMemo.id)
+      .then((article) => setArticleStatus(article))
+      .catch(() => setArticleStatus(null));
   }, [selectedMemo]);
 
   useEffect(() => {
@@ -122,11 +182,57 @@ export function MemoSection() {
       await updateMemo(latest);
       setOriginalContent(latest);
       originalContentRef.current = latest;
+      broadcastUpdate(latest);
       console.log('메모가 저장되었습니다.');
     } catch (error) {
       console.error('Failed to save memo:', error);
     }
-  }, [selectedMemo, updateMemo]);
+  }, [selectedMemo, updateMemo, broadcastUpdate]);
+
+  // 게시 / 재게시 핸들러
+  const handlePublish = useCallback(async () => {
+    if (!selectedMemo) return;
+
+    // 저장되지 않은 변경사항이 있으면 먼저 저장
+    if (contentRef.current !== originalContentRef.current) {
+      await handleSaveMemo();
+    }
+
+    setIsPublishing(true);
+    setPublishMessage(null);
+    try {
+      const article = await publishArticle(selectedMemo.id);
+      setArticleStatus(article);
+      setPublishMessage(articleStatus ? `v${article.publishedVersion}으로 업데이트됨` : '게시 완료');
+      setTimeout(() => setPublishMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to publish:', error);
+      setPublishMessage('게시 실패');
+      setTimeout(() => setPublishMessage(null), 3000);
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [selectedMemo, handleSaveMemo, articleStatus]);
+
+  // 게시 취소 핸들러
+  const handleUnpublish = useCallback(async () => {
+    if (!articleStatus) return;
+
+    setIsPublishing(true);
+    setPublishMessage(null);
+    try {
+      await deleteArticle(articleStatus.id);
+      setArticleStatus(null);
+      setPublishMessage('게시 취소됨');
+      setTimeout(() => setPublishMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to unpublish:', error);
+      setPublishMessage('게시 취소 실패');
+      setTimeout(() => setPublishMessage(null), 3000);
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [articleStatus]);
 
   const handleInsertMemoLink = useCallback(
     (memo: { id: string; title: string }) => {
@@ -204,12 +310,16 @@ export function MemoSection() {
     const isBackspace = e.key === 'Backspace';
     if (!isPrintable && !isEnter && !isBackspace) return;
 
+    // 다른 사용자가 편집 중이면 열지 않음
+    if (isLockedByOtherRef.current || lockHolder) return;
+
     // 기본 동작 막고 textarea 열기
     e.preventDefault();
+    requestLock();
     setShowTextarea(true);
     resetTimer();
 
-    // (선택) 첫 입력을 content에 반영해서 "첫 글자 씹힘" 방지
+    // (선택) 첫 입력을 content에 반영해서 "첫 글자 씩힘" 방지
     setContent((prev) => {
       if (isBackspace) return prev.slice(0, -1);
       if (isEnter) return prev + '\n';
@@ -229,7 +339,7 @@ export function MemoSection() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleSaveMemo, showTextarea]);
+  }, [handleSaveMemo, showTextarea, lockHolder, requestLock]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
@@ -448,11 +558,38 @@ export function MemoSection() {
             <span className="text-xs text-orange-600 font-normal">• 저장 안됨</span>
           </h1>
         )}
-        <div className="fixed bottom-[calc(100vh-70px)] right-2 flex flex-col">
+        {lockMessage && (
+          <div className="absolute right-2 top-6 z-10">
+            <span className="text-xs text-yellow-400 font-medium bg-gray-800/80 px-2 py-1 rounded">{lockMessage}</span>
+          </div>
+        )}
+        <div className="fixed bottom-[calc(100vh-70px)] right-2 flex flex-col items-end gap-1">
           <div className="text-sm text-gray-500">
             {typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘S' : 'Ctrl+S'}로 저장
           </div>
-          
+          {isAdmin && (
+            <>
+              <button
+                onClick={handlePublish}
+                disabled={isPublishing}
+                className="text-xs px-3 py-1 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPublishing ? '게시 중...' : articleStatus ? `재게시 (v${articleStatus.publishedVersion})` : '게시'}
+              </button>
+              {articleStatus && (
+                <button
+                  onClick={handleUnpublish}
+                  disabled={isPublishing}
+                  className="text-xs px-3 py-1 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPublishing ? '처리 중...' : '게시 취소'}
+                </button>
+              )}
+            </>
+          )}
+          {publishMessage && (
+            <span className="text-xs text-green-500">{publishMessage}</span>
+          )}
         </div>
 
         <div className="overflow-hidden flex flex-col h-full min-h-0">

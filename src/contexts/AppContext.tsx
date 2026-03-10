@@ -17,6 +17,7 @@ import type {
   SortOption,
 } from '@/lib/types';
 import * as api from '@/lib/api';
+import { useAuth } from './AuthContext';
 
 const initialState: TodoAppStateInterface = {
   selectedProject: null,
@@ -27,13 +28,15 @@ const initialState: TodoAppStateInterface = {
   sortOption: 'created',
   isLoading: false,
   error: null,
+  selectedMemoIds: [],
+  members: [],
 };
 
 const AppContext = createContext<TodoAppContextTypeInterface | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [state, setState] = useState<TodoAppStateInterface>(initialState);
-
 
   const loadProjects = async () => {
     try {
@@ -49,24 +52,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 초기 데이터 로드
+  // 인증 상태 변경 시 프로젝트 로드 (로그인 시) 또는 초기화 (로그아웃 시)
   useEffect(() => {
-    Promise.resolve().then(loadProjects);
-  }, []);
+    if (isAuthenticated) {
+      Promise.resolve().then(loadProjects);
+    } else {
+      Promise.resolve().then(() => setState(initialState));
+    }
+  }, [isAuthenticated]);
 
   // Project Actions
   const selectProject = useCallback(async (project: ProjectInterface) => {
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-      // 프로젝트의 메모 리스트 로드
       const memos = await api.getProjectMemos(project.id);
 
       setState((prev) => ({
         ...prev,
         selectedProject: project,
         memos,
-        selectedMemo: null, // 프로젝트 변경 시 선택된 메모 초기화
+        selectedMemo: null,
+        selectedMemoIds: [],
+        members: [],
         isLoading: false,
       }));
      } catch {
@@ -91,7 +99,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           isLoading: false,
         }));
 
-        // 새로 생성한 프로젝트 자동 선택
         await selectProject(newProject);
        } catch (error) {
         setState((prev) => ({
@@ -126,12 +133,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-      // 메모 상세 정보 로드
       const fullMemo = await api.getMemo(memo.id);
 
       setState((prev) => ({
         ...prev,
         selectedMemo: fullMemo,
+        selectedMemoIds: [],
         isLoading: false,
       }));
      } catch {
@@ -167,9 +174,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           isLoading: false,
         }));
 
-        // 새로 생성한 메모 자동 선택
         await selectMemo(newMemo);
-       } catch (error) {
+      } catch (error) {
+        const err = error as Error & { existingMemoId?: string };
+        if (err.message === 'Duplicate memo title' && err.existingMemoId) {
+          const existingMemo = state.memos.find((m) => m.id === err.existingMemoId);
+          if (existingMemo) {
+            setState((prev) => ({ ...prev, isLoading: false }));
+            await selectMemo(existingMemo);
+            return;
+          }
+        }
+
         setState((prev) => ({
           ...prev,
           error: '메모 생성에 실패했습니다.',
@@ -178,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [state.selectedProject, selectMemo]
+    [state.selectedProject, state.memos, selectMemo]
   );
 
   const updateMemo = useCallback(
@@ -216,6 +232,84 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, sortOption: option }));
   }, []);
 
+  const toggleSelectMemo = useCallback((memoId: string) => {
+    setState((prev) => {
+      const isSelected = prev.selectedMemoIds.includes(memoId);
+      return {
+        ...prev,
+        selectedMemoIds: isSelected
+          ? prev.selectedMemoIds.filter((id) => id !== memoId)
+          : [...prev.selectedMemoIds, memoId],
+        selectedMemo: null,
+      };
+    });
+  }, []);
+
+  const clearSelectedMemos = useCallback(() => {
+    setState((prev) => ({ ...prev, selectedMemoIds: [] }));
+  }, []);
+
+  const deleteMemos = useCallback(async (memoIds: string[]) => {
+    try {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      await api.bulkDeleteMemos(memoIds);
+      setState((prev) => ({
+        ...prev,
+        memos: prev.memos.filter((m) => !memoIds.includes(m.id)),
+        selectedMemoIds: [],
+        selectedMemo: null,
+        isLoading: false,
+      }));
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        error: '메모 삭제에 실패했습니다.',
+        isLoading: false,
+      }));
+    }
+  }, []);
+
+  // Member Actions
+  const loadMembers = useCallback(async (projectId: string) => {
+    try {
+      const members = await api.getProjectMembers(projectId);
+      setState((prev) => ({ ...prev, members }));
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        error: '멤버 목록을 불러오는데 실패했습니다.',
+      }));
+    }
+  }, []);
+
+  const inviteMember = useCallback(async (projectId: string, userId: string) => {
+    try {
+      await api.inviteMember(projectId, userId);
+      // 멤버 목록 새로고침
+      const members = await api.getProjectMembers(projectId);
+      setState((prev) => ({ ...prev, members }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '멤버 초대에 실패했습니다.';
+      setState((prev) => ({ ...prev, error: message }));
+      throw error;
+    }
+  }, []);
+
+  const removeMember = useCallback(async (projectId: string, userId: string) => {
+    try {
+      await api.removeMember(projectId, userId);
+      setState((prev) => ({
+        ...prev,
+        members: prev.members.filter((m) => m.userId !== userId),
+      }));
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        error: '멤버 제거에 실패했습니다.',
+      }));
+    }
+  }, []);
+
   // URL 쿼리 파라미터로 메모 열기
   useEffect(() => {
     const openMemoFromUrl = async () => {
@@ -230,7 +324,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (project && (!state.selectedProject || state.selectedProject.id !== projectId)) {
           await selectProject(project);
 
-          // 메모 선택
           setTimeout(async () => {
             try {
               const memos = await api.getProjectMemos(projectId);
@@ -258,6 +351,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     createMemo,
     updateMemo,
     setSortOption,
+    toggleSelectMemo,
+    clearSelectedMemos,
+    deleteMemos,
+    loadMembers,
+    inviteMember,
+    removeMember,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

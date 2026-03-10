@@ -1,7 +1,7 @@
 import type { SortOption } from "./types";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3031/api/todo";
 
 export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "created", label: "생성순" },
