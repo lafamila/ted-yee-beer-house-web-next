@@ -247,8 +247,9 @@ export default function MemoListSection() {
     <>
     <div className="content">
       <div className="main-container">
-        <div className="title-container">
+        <div className="title-container flex items-center gap-2">
           <span>{selectedProject.name}</span>
+          <div id="screen-share-buttons" />
         </div>
         <div className="main">
           <div style={{ paddingTop: "20px" }} className="flex items-center justify-between">

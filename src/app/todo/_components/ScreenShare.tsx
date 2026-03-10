@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Room, RoomEvent, Track, type RemoteTrack, type RemoteTrackPublication } from 'livekit-client';
 import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +49,8 @@ export default function ScreenShare() {
   const [isJoiningViewer, setIsJoiningViewer] = useState(false);
   const [isStartingShare, setIsStartingShare] = useState(false);
   const [viewerRect, setViewerRect] = useState<ViewerRect | null>(null);
+  const [buttonPortalTarget, setButtonPortalTarget] = useState<HTMLElement | null>(null);
+
 
   const viewerShellRef = useRef<HTMLDivElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement | null>(null);
@@ -103,6 +106,12 @@ export default function ScreenShare() {
       setViewerRect(null);
     }
   }, [projectId]);
+
+  useEffect(() => {
+    const el = document.getElementById('screen-share-buttons');
+    setButtonPortalTarget(el);
+  }, [projectId]);
+
 
   useEffect(() => {
     if (!isViewerOpen) {
@@ -341,42 +350,45 @@ export default function ScreenShare() {
 
   return (
     <>
-      <div className="fixed top-3 right-3 z-40 flex items-center gap-2">
-        {!hasAnotherSharer && !isSelfSharer && (
-          <button
-            type="button"
-            onClick={() => void handleStartShare()}
-            disabled={isStartingShare}
-            className="rounded-md border border-gray-600 bg-gray-900 px-3 py-1.5 text-sm text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isStartingShare ? '공유 준비 중...' : '화면 공유'}
-          </button>
-        )}
+      {buttonPortalTarget && createPortal(
+        <div className="flex items-center gap-2">
+          {!hasAnotherSharer && !isSelfSharer && (
+            <button
+              type="button"
+              onClick={() => void handleStartShare()}
+              disabled={isStartingShare}
+              className="rounded-md border border-gray-600 bg-gray-900 px-3 py-1.5 text-sm text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isStartingShare ? '공유 준비 중...' : '화면 공유'}
+            </button>
+          )}
 
-        {hasAnotherSharer && !isSelfSharer && (
-          <button
-            type="button"
-            onClick={handleJoinViewer}
-            className="rounded-md border border-emerald-500/60 bg-emerald-600/20 px-3 py-1.5 text-sm font-medium text-emerald-200 transition-colors hover:bg-emerald-500/30"
-          >
-            참가하기
-          </button>
-        )}
+          {hasAnotherSharer && !isSelfSharer && (
+            <button
+              type="button"
+              onClick={handleJoinViewer}
+              className="rounded-md border border-emerald-500/60 bg-emerald-600/20 px-3 py-1.5 text-sm font-medium text-emerald-200 transition-colors hover:bg-emerald-500/30"
+            >
+              참가하기
+            </button>
+          )}
 
-        {isSelfSharer && (
-          <button
-            type="button"
-            onClick={() => void handleStopShare()}
-            className="rounded-md border border-red-500/60 bg-red-600/20 px-3 py-1.5 text-sm font-medium text-red-200 transition-colors hover:bg-red-500/30"
-          >
-            공유 중지
-          </button>
-        )}
-      </div>
+          {isSelfSharer && (
+            <button
+              type="button"
+              onClick={() => void handleStopShare()}
+              className="rounded-md border border-red-500/60 bg-red-600/20 px-3 py-1.5 text-sm font-medium text-red-200 transition-colors hover:bg-red-500/30"
+            >
+              공유 중지
+            </button>
+          )}
+        </div>,
+        buttonPortalTarget,
+      )}
 
       <div
         className={cn(
-          'fixed top-3 right-3 z-50 rounded-lg bg-gray-950/95 px-4 py-3 text-sm text-white shadow-xl transition-all duration-300',
+          'fixed top-3 left-1/2 -translate-x-1/2 z-50 rounded-lg bg-gray-950/95 px-4 py-3 text-sm text-white shadow-xl transition-all duration-300',
           toastMessage ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0 pointer-events-none',
         )}
       >
