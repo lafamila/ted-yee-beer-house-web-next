@@ -1,46 +1,86 @@
 "use client";
 
+import { useMemo } from "react";
 import { WeatherData } from "./useWeather";
 
 interface WeatherBackgroundProps {
   weather: WeatherData;
 }
 
-function RainEffect() {
+interface ParticleStyle {
+  left: string;
+  top: string;
+  width?: string;
+  height: string;
+  animationDelay: string;
+  animationDuration: string;
+}
+
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 49297;
+  return x - Math.floor(x);
+}
+
+function generateRainParticles(count: number): ParticleStyle[] {
+  return Array.from({ length: count }, (_, i) => ({
+    left: `${seededRandom(i * 7 + 1) * 100}%`,
+    top: `-${seededRandom(i * 7 + 2) * 20}%`,
+    height: `${12 + seededRandom(i * 7 + 3) * 18}px`,
+    animationDelay: `${seededRandom(i * 7 + 4) * 2}s`,
+    animationDuration: `${0.6 + seededRandom(i * 7 + 5) * 0.4}s`,
+  }));
+}
+
+function generateSnowParticles(count: number): ParticleStyle[] {
+  return Array.from({ length: count }, (_, i) => {
+    const size = `${2 + seededRandom(i * 7 + 101) * 4}px`;
+    return {
+      left: `${seededRandom(i * 7 + 102) * 100}%`,
+      top: `-5%`,
+      width: size,
+      height: size,
+      animationDelay: `${seededRandom(i * 7 + 103) * 5}s`,
+      animationDuration: `${3 + seededRandom(i * 7 + 104) * 4}s`,
+    };
+  });
+}
+
+function generateStarParticles(count: number): ParticleStyle[] {
+  return Array.from({ length: count }, (_, i) => {
+    const size = `${1 + seededRandom(i * 7 + 201) * 2}px`;
+    return {
+      left: `${seededRandom(i * 7 + 202) * 100}%`,
+      top: `${seededRandom(i * 7 + 203) * 40}%`,
+      width: size,
+      height: size,
+      animationDelay: `${seededRandom(i * 7 + 204) * 3}s`,
+      animationDuration: `${2 + seededRandom(i * 7 + 205) * 3}s`,
+    };
+  });
+}
+
+function RainEffect({ particles }: { particles: ParticleStyle[] }) {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]">
-      {Array.from({ length: 40 }).map((_, i) => (
+      {particles.map((style, i) => (
         <div
           key={i}
           className="absolute w-[1px] bg-blue-300/40 animate-rain"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `-${Math.random() * 20}%`,
-            height: `${12 + Math.random() * 18}px`,
-            animationDelay: `${Math.random() * 2}s`,
-            animationDuration: `${0.6 + Math.random() * 0.4}s`,
-          }}
+          style={style}
         />
       ))}
     </div>
   );
 }
 
-function SnowEffect() {
+function SnowEffect({ particles }: { particles: ParticleStyle[] }) {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]">
-      {Array.from({ length: 50 }).map((_, i) => (
+      {particles.map((style, i) => (
         <div
           key={i}
           className="absolute rounded-full bg-white/60 animate-snow"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `-5%`,
-            width: `${2 + Math.random() * 4}px`,
-            height: `${2 + Math.random() * 4}px`,
-            animationDelay: `${Math.random() * 5}s`,
-            animationDuration: `${3 + Math.random() * 4}s`,
-          }}
+          style={style}
         />
       ))}
       {/* Frost overlay on edges */}
@@ -49,21 +89,14 @@ function SnowEffect() {
   );
 }
 
-function StarEffect() {
+function StarEffect({ particles }: { particles: ParticleStyle[] }) {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]">
-      {Array.from({ length: 30 }).map((_, i) => (
+      {particles.map((style, i) => (
         <div
           key={i}
           className="absolute rounded-full bg-white animate-twinkle"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 40}%`,
-            width: `${1 + Math.random() * 2}px`,
-            height: `${1 + Math.random() * 2}px`,
-            animationDelay: `${Math.random() * 3}s`,
-            animationDuration: `${2 + Math.random() * 3}s`,
-          }}
+          style={style}
         />
       ))}
     </div>
@@ -159,6 +192,10 @@ export default function WeatherBackground({ weather }: WeatherBackgroundProps) {
   const key = `${weather.timeOfDay}_${weather.weather}` as ThemeKey;
   const theme = THEME_CONFIGS[key] ?? THEME_CONFIGS.night_clear;
 
+  const rainParticles = useMemo(() => generateRainParticles(40), []);
+  const snowParticles = useMemo(() => generateSnowParticles(50), []);
+  const starParticles = useMemo(() => generateStarParticles(30), []);
+
   return (
     <div className="fixed inset-0 z-0 pointer-events-none">
       {/* Base grid */}
@@ -183,10 +220,10 @@ export default function WeatherBackground({ weather }: WeatherBackgroundProps) {
       )}
 
       {/* Weather effects */}
-      {weather.weather === "rain" && <RainEffect />}
-      {weather.weather === "snow" && <SnowEffect />}
+      {weather.weather === "rain" && <RainEffect particles={rainParticles} />}
+      {weather.weather === "snow" && <SnowEffect particles={snowParticles} />}
       {weather.timeOfDay === "night" && weather.weather === "clear" && (
-        <StarEffect />
+        <StarEffect particles={starParticles} />
       )}
     </div>
   );
