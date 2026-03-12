@@ -5,37 +5,29 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Minimize2, Maximize2 } from "lucide-react";
 import { Terminal } from "@/components/ui/Terminal";
 import { TerminalHandler } from "@/lib/types";
+import { useTheme } from "./theme";
 
 interface BarTerminalOverlayProps {
   isOpen: boolean;
   onClose: () => void;
   elapsedSeconds: number;
+  onDrunkEffect?: (drinkCount: number) => void;
+  onDeleteEffect?: (sections: string[], onComplete: () => void) => void;
 }
+
+export const BAR_SECTIONS = [
+  "neon-sign",
+  "menu-board",
+  "bartender-intro",
+  "beer-glass",
+  "bar-tab",
+  "grid-cards",
+] as const;
+
+export type BarSectionId = (typeof BAR_SECTIONS)[number];
 
 // ─── State machines for special modes ───
 type TerminalMode = "normal" | "vim" | "python" | "drunk";
-
-// ─── Data ───
-const DEV_TIPS = [
-  "git stash is your friend. Unless you forget about it. Then it's your enemy.",
-  "The best error message is the one you never see.",
-  "If debugging is the process of removing bugs, then programming is the process of putting them in.",
-  "It works on my machine. Ship my machine.",
-  "There are only two hard things in CS: cache invalidation, naming things, and off-by-one errors.",
-  "A SQL query walks into a bar, sees two tables, and asks: 'Can I JOIN you?'",
-  "Why do programmers prefer dark mode? Because light attracts bugs.",
-  "To understand recursion, you must first understand recursion.",
-  "The best code is no code at all. Every new line of code you willingly bring into the world is code that has to be debugged.",
-  "rm -rf node_modules && npm install — the universal fix.",
-];
-
-const JUKEBOX_RESPONSES = [
-  "🎵 Now playing: 'lo-fi hip hop beats to mass-produce bugs to'",
-  "🎵 Now playing: 'Despacito (npm install remix)'",
-  "🎵 Now playing: 'Never Gonna Give You Up' ... wait, you just got rick-rolled in a terminal.",
-  "🎵 Sorry, the jukebox only plays lo-fi hip hop beats to code/relax to.",
-  "🎵 Now playing: 'The Sound of Silence' (by your test suite)",
-];
 
 function formatTabTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -43,193 +35,6 @@ function formatTabTime(seconds: number): string {
   if (m === 0) return `${s} seconds`;
   return `${m}m ${s}s`;
 }
-
-function getOrderResponse(item: string, count: number): string | string[] {
-  const responses: Record<string, string[]> = {
-    beer: [
-      "🍺 Pouring you a cold one... That'll be 0 ETH.",
-      "🍺🍺 Another one? Bold choice for a weeknight.",
-      "🍺🍺🍺 The bartender is starting to judge you.",
-    ],
-    soju: [
-      "🥃 Here you go. Careful, it's strong.",
-      "🥃🥃 Another one? Bold choice.",
-      "🥃🥃🥃 Okay, last one.",
-    ],
-    coffee: [
-      "☕ Here's your artisanal, single-origin, pour-over... just kidding, it's instant.",
-      "☕☕ Double shot? You must have a deadline.",
-      "☕☕☕ At this point, just inject the caffeine directly.",
-    ],
-    water: [
-      "💧 Hydration is important. Good choice.",
-      "💧💧 Still water? Or sparkling? Just kidding, we only have tap.",
-      "💧💧💧 The healthiest order we've seen all day.",
-    ],
-  };
-
-  const key = item.toLowerCase();
-  const msgs = responses[key];
-  if (!msgs) return `We don't serve '${item}' here. Try: beer, soju, coffee, water.`;
-
-  const idx = Math.min(count - 1, msgs.length - 1);
-  return msgs[idx];
-}
-
-const TECH_MENU = [
-  "╔══════════════════════════════════════════╗",
-  "║       🍺 TECH STACK MENU 🍺             ║",
-  "╠══════════════════════════════════════════╣",
-  "║                                          ║",
-  "║  Frontend                                ║",
-  "║  ├─ React 19 ................ Draft IPA   ║",
-  "║  ├─ Next.js 16 ............. Stout        ║",
-  "║  ├─ TypeScript ............. Pale Ale     ║",
-  "║  └─ Tailwind v4 ........... Light Lager   ║",
-  "║                                          ║",
-  "║  Backend                                  ║",
-  "║  ├─ NestJS ................. Porter       ║",
-  "║  ├─ FastAPI ................ Wheat Beer   ║",
-  "║  └─ Python ................. Pilsner      ║",
-  "║                                          ║",
-  "║  Infrastructure                           ║",
-  "║  ├─ Docker ................. Bock         ║",
-  "║  ├─ MySQL .................. Amber Ale    ║",
-  "║  └─ GitHub Actions ........ Sour Beer     ║",
-  "║                                          ║",
-  "║  * All drinks are open-source             ║",
-  "║  * No vendor lock-in (except npm)         ║",
-  "╚══════════════════════════════════════════╝",
-];
-
-const GIT_BLAME_OUTPUT = [
-  "git blame src/life/choices.ts",
-  "",
-  'a3f2c1d (Teddy  2026-01-15)  const career = "developer";     // seemed like a good idea',
-  "b7e4a2f (Teddy  2026-01-15)  const sleep = null;              // TODO: implement someday",
-  "c9d3b1a (Teddy  2026-01-16)  const coffee = Infinity;         // non-negotiable",
-  'd2f5c3e (Past-Teddy  2019-03-20)  // "this will be easy and fun"',
-  'e1a4d2b (Teddy  2026-02-01)  const narrator = "it was not";',
-];
-
-const NEOFETCH_OUTPUT = [
-  "        🍺🍺🍺🍺           teddy@ted-yee-beer-house",
-  "       🍺      🍺          ─────────────────────────",
-  "      🍺        🍺         OS: macOS (deploys to Linux)",
-  "      🍺        🍺         Host: Ted-yee Beer House, Seoul",
-  "      🍺        🍺         Uptime: since 19XX",
-  "       🍺      🍺          Shell: zsh (47 unused aliases)",
-  "        🍺🍺🍺🍺           Stack: React, Next.js, NestJS, FastAPI",
-  "                            Coffee: ██████████████████ 142%",
-  "                            Beer:   █████████░░░░░░░░ 52%",
-  "                            Bugs:   ░░░░░░░░░░░░░░░░░ 0%*",
-  "",
-  "                            * in production. we don't talk about staging.",
-];
-
-const MAN_TEDDY_OUTPUT = [
-  "TEDDY(1)                    Beer House Manual                    TEDDY(1)",
-  "",
-  "NAME",
-  "       teddy — a developer who codes, brews ideas, and occasionally sleeps",
-  "",
-  "SYNOPSIS",
-  "       teddy [--coffee] [--beer] [--code] [--sleep (deprecated)]",
-  "",
-  "DESCRIPTION",
-  "       Full-stack developer based in Seoul. Known for building things",
-  "       nobody asked for, then convincing everyone they needed it.",
-  "",
-  "       Fluent in mass-producing side projects and mass-abandoning them.",
-  "",
-  "OPTIONS",
-  "       --coffee     Required. Will not function without this flag.",
-  "       --beer       +200% creativity. -400% git hygiene.",
-  "       --code       Default behavior. Cannot be disabled.",
-  "       --sleep      Deprecated since v2.0. Use --coffee instead.",
-  "",
-  "BUGS",
-  '       Known issue: says "5 more minutes" but means 3 more hours.',
-  "       Will not be fixed.",
-  "",
-  "SEE ALSO",
-  "       lafamila(1), kyoungmin(1), ted-yee-beer-house(7)",
-  "",
-  "AUTHOR",
-  "       Written by someone who should probably be sleeping right now.",
-  "",
-  "Ted-yee Beer House              March 2026                       TEDDY(1)",
-];
-
-const TRACEROUTE_OUTPUT = [
-  "traceroute to teddy (127.0.0.1), 30 hops max",
-  "",
-  " 1  childhood (192.168.0.1)        ∞ ms    dreaming of being an astronaut",
-  " 2  first-hello-world (10.0.1.1)   2005 ms  print(\"hello world\") in BASIC",
-  " 3  cs-degree (172.16.0.1)         4 yrs   StackOverflow was the real professor",
-  ' 4  first-job (10.10.0.1)          2 ms     "we use our own framework here"',
-  " 5  startup-phase (10.20.0.1)      999 ms   sleep: connection timed out",
-  " 6  * * *                                   (that year we don't talk about)",
-  ' 7  freelance (10.30.0.1)          varies   "the deadline is flexible" (it wasn\'t)',
-  " 8  ted-yee-beer-house (127.0.0.1) 1 ms     you are here. 🍺",
-];
-
-const NPM_INSTALL_OUTPUT = [
-  "npm WARN deprecated sleep@1.0.0: who needs sleep anyway",
-  "npm WARN deprecated weekend@2.0.0: not compatible with developer lifestyle",
-  "",
-  "added 847 packages in 3.2s",
-  "127 packages are looking for funding",
-  "  run `npm fund` to guilt-trip yourself",
-  "",
-  "3 high severity vulnerabilities",
-  "  run `npm audit fix` to mass-produce new bugs",
-];
-
-const BREW_INSTALL_OUTPUT = [
-  "==> Downloading https://ted-yee-beer-house/api/fridge/ipa",
-  "######################################################################## 100.0%",
-  "==> Pouring beer--fresh.arm64_sonoma.bottle.tar.gz",
-  "🍺  /usr/local/Cellar/beer/fresh: 1 file, 500ml poured",
-  "==> Caveats",
-  "Best served cold. Do not operate kubectl after consumption.",
-  "To restart at login:",
-  "  brew services start beer --repeat",
-];
-
-const DOCKER_RUN_OUTPUT = [
-  "Unable to find image 'productivity:latest' locally",
-  "latest: Pulling from teddy/productivity",
-  "e3b0c442: Pull complete",
-  "Digest: sha256:deadbeef...",
-  "Status: Downloaded newer image for productivity:latest",
-  "",
-  "CONTAINER ID   IMAGE                STATUS           NAMES",
-  "a1b2c3d4e5f6   productivity:latest  Exited (137)     hopeless-attempt",
-  "f6e5d4c3b2a1   procrastination:lts  Up 47 hours      comfortable-routine",
-];
-
-const SSH_OUTPUT = [
-  "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
-  "@    WARNING: DEPLOYING ON FRIDAY NIGHT   @",
-  "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
-  "Connection refused.",
-  "The bartender has revoked your production access.",
-  "Have another beer instead. 🍺",
-];
-
-const ZEN_OF_TEDDY = [
-  "The Zen of Teddy, by lafamila",
-  "",
-  "Beer is better than wine (in this house).",
-  "Explicit is better than implicit, except for easter eggs.",
-  "Simple is better than complex, but complex is more fun.",
-  "Errors should never pass silently, unless it's Friday.",
-  "In the face of ambiguity, order another round.",
-  "There should be one obvious way to do it — but hide 12 others.",
-  "Now is better than never, but after this beer is often better than now.",
-  "If the implementation is hard to explain, buy the reviewer a drink.",
-];
 
 const SL_FRAMES = [
   [
@@ -248,39 +53,30 @@ const SL_FRAMES = [
 
 const MATRIX_CHARS = "ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ0123456789ABCDEF";
 
-const CAT_ASCII = [
-  "  /\\_/\\  ",
-  " ( o.o ) ",
-  "  > ^ <",
-  " /|   |\\",
-  "(_|   |_)",
-  "",
-  "What did you expect? This is a bar, not a filesystem.",
-  "Try: cat /menu, cat /rules, cat /wifi",
-];
+function isRootDeleteCommand(args: string[]): boolean {
+  const normalized = args.join(" ").replace(/\s+/g, " ").trim();
+  const patterns = [
+    "rm -rf /",
+    "rm -rf /*",
+    "rm -rf ./",
+    "rm -rf .",
+    "rm -rf / --no-preserve-root",
+    "rm -rf --no-preserve-root /",
+    "rm -rf --no-preserve-root /*",
+    "rm -rf /* --no-preserve-root",
+  ];
 
-const CAT_WIFI = [
-  "SSID: TedYeeBeerHouse_5G",
-  "Password: undefined",
-  "",
-  "Note: If you can't connect, try turning it off and on again.",
-  "      If that doesn't work, the password is probably null.",
-];
-
-const CAT_RULES = [
-  "📋 House Rules:",
-  "  1. No console.log() debugging in production",
-  "  2. Tabs vs Spaces? We don't talk about that here",
-  "  3. No deploying on Fridays",
-  "  4. All bugs are 'features' until proven otherwise",
-  "  5. The bartender is always right",
-];
+  return patterns.includes(normalized);
+}
 
 export default function BarTerminalOverlay({
   isOpen,
   onClose,
   elapsedSeconds,
+  onDrunkEffect,
+  onDeleteEffect,
 }: BarTerminalOverlayProps) {
+  const theme = useTheme();
   const [isMaximized, setIsMaximized] = useState(false);
   const terminalRef = useRef<TerminalHandler>(null);
   const orderCountRef = useRef<Record<string, number>>({});
@@ -345,7 +141,8 @@ export default function BarTerminalOverlay({
             "Congratulations. You are one of the 3% who escape vim on the first try.",
           ];
         }
-        return "-- INSERT -- (type :q! or :wq to escape)";
+        // In vim, typed text is buffer content — don't echo (Terminal handles display)
+        return [];
       }
 
       // ─── Python REPL mode ───
@@ -359,13 +156,13 @@ export default function BarTerminalOverlay({
           return "Redirecting to xkcd.com... just kidding. Gravity is what keeps the beer in the glass.";
         }
         if (fullCmd === "import this") {
-          return ZEN_OF_TEDDY;
+          return theme.terminal.zenOutput;
         }
         if (fullCmd.startsWith("print(")) {
           const content = fullCmd.slice(6, -1).replace(/['"]/g, "");
           return content || '""';
         }
-        return `NameError: name '${cmd}' is not defined. This is a bar, not a Jupyter notebook.`;
+        return `NameError: name '${cmd}' is not defined. This is a ${theme.type === "bar" ? "bar" : "café"}, not a Jupyter notebook.`;
       }
 
       // ─── Drunk mode (temporary) ───
@@ -377,7 +174,7 @@ export default function BarTerminalOverlay({
           .join("");
         modeRef.current = "normal";
         forceUpdate((n) => n + 1);
-        return `${garbled}... *hic* The bartender cut you off. Switching to water. 💧 Stay hydrated, developer.`;
+        return `${garbled}${theme.drinks.cutoffMessage}`;
       }
 
       // ─── Normal mode commands ───
@@ -385,30 +182,38 @@ export default function BarTerminalOverlay({
       // Bar commands
       if (cmd === "order") {
         const item = args[0] || "";
-        if (!item) return "What would you like? Try: order beer, order soju, order coffee, order water";
+        if (!item) return theme.drinks.orderPrompt;
         const key = item.toLowerCase();
         orderCountRef.current[key] = (orderCountRef.current[key] || 0) + 1;
         const count = orderCountRef.current[key];
 
-        // Soju 3x easter egg
-        if (key === "soju" && count >= 3) {
-          orderCountRef.current[key] = 0;
+        const effectDrink = theme.drinks.effectDrinks.find((d) => d.name === key);
+        if (effectDrink && count >= effectDrink.threshold) {
+          onDrunkEffect?.(count);
+        }
+
+        const heavyDrink = theme.drinks.effectDrinks[0];
+        if (
+          heavyDrink &&
+          key === heavyDrink.name &&
+          count >= heavyDrink.threshold + 1 &&
+          count % 3 === 0
+        ) {
           modeRef.current = "drunk";
           forceUpdate((n) => n + 1);
           setTimeout(() => {
             modeRef.current = "normal";
             forceUpdate((n) => n + 1);
           }, 5000);
-          return [
-            "🥃🥃🥃 Okay, last one.",
-            "...",
-            "Actually, you know what?",
-            "",
-            "[The room starts spinning...]",
-          ];
+          return theme.drinks.heavyEffectMessages;
         }
 
-        return getOrderResponse(item, count);
+        const msgs = theme.drinks.orderResponses[key];
+        if (!msgs) {
+          return `We don't serve '${item}' here. Try: ${theme.drinks.orderItems.join(", ")}.`;
+        }
+        const idx = Math.min(count - 1, msgs.length - 1);
+        return msgs[idx];
       }
 
       if (cmd === "tab") {
@@ -421,40 +226,54 @@ export default function BarTerminalOverlay({
         ];
       }
 
-      if (cmd === "menu") return TECH_MENU;
+      if (cmd === "menu") return theme.menu.techMenu;
 
       if (cmd === "tip") {
-        return DEV_TIPS[Math.floor(Math.random() * DEV_TIPS.length)];
+        return theme.terminal.devTips[Math.floor(Math.random() * theme.terminal.devTips.length)];
       }
 
       if (cmd === "jukebox") {
-        return JUKEBOX_RESPONSES[Math.floor(Math.random() * JUKEBOX_RESPONSES.length)];
+        return theme.terminal.jukeboxResponses[
+          Math.floor(Math.random() * theme.terminal.jukeboxResponses.length)
+        ];
       }
 
       // ─── Dev easter eggs Tier 1 ───
-      if (cmd === "sudo" && args.join(" ") === "rm -rf /") {
-        terminalRef.current?.print("Deleting ted-yee-beer-house...");
-        const files = [
-          "Removing /bar/fridge/beer_01.ipa .......... done",
-          "Removing /bar/fridge/beer_02.lager ....... done",
-          "Removing /bar/jukebox/lofi_playlist ..... done",
-          "Removing /bar/memories/* ................ done",
-        ];
+      if (cmd === "sudo" && isRootDeleteCommand(args)) {
+        terminalRef.current?.print(
+          `Deleting ted-yee-${theme.type === "bar" ? "beer" : "coffee"}-house...`
+        );
+        const sections = [...BAR_SECTIONS];
+        sections.sort(() => Math.random() - 0.5); // Shuffle the sections for dramatic effect
+        const files = sections.map(
+          (sectionId) =>
+            `Removing ${theme.terminal.sectionLabels[sectionId] || sectionId} .......... done`
+        );
         printDelayed(files, 400);
-        setTimeout(() => {
-          terminalRef.current?.print("");
-          terminalRef.current?.print(
-            "Just kidding. This is a bar, not your production server."
-          );
-          terminalRef.current?.print(
-            "But your tab just doubled for trying. 🍺🍺"
-          );
-        }, files.length * 400 + 500);
+
+        const printJkAndRestore = () => {
+          setTimeout(() => {
+            onDeleteEffect?.([], () => undefined);
+            terminalRef.current?.print("");
+            terminalRef.current?.print(
+              `Just kidding. This is a ${theme.type === "bar" ? "bar" : "café"}, not your production server.`
+            );
+            terminalRef.current?.print(
+              `But your tab just doubled for trying. ${theme.barTab.drinkEmoji}${theme.barTab.drinkEmoji}`
+            );
+          }, 500);
+        };
+
+        if (onDeleteEffect) {
+          onDeleteEffect(sections as string[], printJkAndRestore);
+        } else {
+          setTimeout(printJkAndRestore, files.length * 400);
+        }
         return;
       }
 
       if (cmd === "sudo") {
-        return "Nice try. The bartender doesn't grant sudo access.";
+        return `Nice try. The ${theme.type === "bar" ? "bartender" : "barista"} doesn't grant sudo access.`;
       }
 
       if (cmd === "vim" || cmd === "vi" || cmd === "nvim") {
@@ -470,7 +289,7 @@ export default function BarTerminalOverlay({
       }
 
       if (cmd === "git" && args[0] === "blame") {
-        return GIT_BLAME_OUTPUT;
+        return theme.terminal.gitBlameOutput;
       }
 
       if (cmd === "git" && args[0] === "push" && args[1] === "--force") {
@@ -508,21 +327,21 @@ export default function BarTerminalOverlay({
       }
 
       if (cmd === "neofetch" || cmd === "fastfetch") {
-        return NEOFETCH_OUTPUT;
+        return theme.terminal.neofetchOutput;
       }
 
       if (cmd === "cat") {
-        if (args.length === 0) return CAT_ASCII;
+        if (args.length === 0) return theme.terminal.catAscii;
         const path = args[0];
-        if (path === "/menu") return TECH_MENU;
-        if (path === "/rules") return CAT_RULES;
-        if (path === "/wifi") return CAT_WIFI;
+        if (path === "/menu") return theme.menu.techMenu;
+        if (path === "/rules") return theme.terminal.catRules;
+        if (path === "/wifi") return theme.terminal.catWifi;
         return `cat: ${path}: No such file or directory (this is a bar, not a filesystem)`;
       }
 
       // ─── Dev easter eggs Tier 2 ───
       if (cmd === "npm" && args[0] === "install") {
-        return NPM_INSTALL_OUTPUT;
+        return theme.terminal.npmInstallOutput;
       }
 
       if (cmd === "npm" && args[0] === "audit" && args[1] === "fix") {
@@ -543,13 +362,13 @@ export default function BarTerminalOverlay({
       if (cmd === "brew" && args[0] === "install") {
         const pkg = args[1] || "beer";
         if (pkg === "beer" || pkg === "ipa" || pkg === "lager") {
-          return BREW_INSTALL_OUTPUT;
+          return theme.terminal.brewInstallOutput;
         }
         return `==> Error: ${pkg} is not a valid beverage. Try: brew install beer`;
       }
 
       if (cmd === "docker" && args[0] === "run") {
-        return DOCKER_RUN_OUTPUT;
+        return theme.terminal.dockerRunOutput;
       }
 
       if (cmd === "docker") {
@@ -562,12 +381,11 @@ export default function BarTerminalOverlay({
         return [
           "Python 3.12.0 (ted-yee-beer-house edition)",
           'Type "help", "copyright", "credits" or "license" for more information.',
-          ">>> ",
         ];
       }
 
       if (cmd === "ssh") {
-        return SSH_OUTPUT;
+        return theme.terminal.sshOutput;
       }
 
       if (cmd === "curl") {
@@ -585,12 +403,12 @@ export default function BarTerminalOverlay({
       }
 
       if (cmd === "traceroute") {
-        return TRACEROUTE_OUTPUT;
+        return theme.terminal.tracerouteOutput;
       }
 
       if (cmd === "man") {
         const page = args[0] || "";
-        if (page === "teddy" || page === "lafamila") return MAN_TEDDY_OUTPUT;
+        if (page === "teddy" || page === "lafamila") return theme.terminal.manOutput;
         return `No manual entry for ${page}. Try: man teddy`;
       }
 
@@ -673,35 +491,17 @@ export default function BarTerminalOverlay({
       }
 
       if (cmd === "help") {
-        return [
-          "help                    Show this help",
-          "clear                   Clear the screen",
-          "echo [text]             Print text",
-          "date                    Print current date",
-          "whoami                  Who am I?",
-          "",
-          "-- Bar Commands --",
-          "order [drink]           Order a drink (beer/soju/coffee/water)",
-          "menu                    View the tech stack menu",
-          "tab                     Check your bar tab",
-          "tip                     Get a random dev tip",
-          "jukebox                 Play some music",
-          "",
-          "-- Navigation --",
-          "game                    Go to game page",
-          "todo                    Go to todo page",
-          "portfolio               Go to portfolio page",
-          "articles                Go to articles page",
-          "",
-          "Psst... developers might find some hidden commands too. 🤫",
-        ];
+        return theme.terminal.helpText;
       }
 
       // Don't handle — let Terminal built-ins try
       return undefined;
     },
-    [elapsedSeconds, onClose, printDelayed, runMatrixEffect, runSlTrain]
+    [elapsedSeconds, onClose, onDeleteEffect, onDrunkEffect, printDelayed, runMatrixEffect, runSlTrain, theme]
   );
+
+  const isVimMode = modeRef.current === "vim";
+  const isPythonMode = modeRef.current === "python";
 
   return (
     <AnimatePresence>
@@ -720,18 +520,19 @@ export default function BarTerminalOverlay({
         >
           <Terminal
             ref={terminalRef}
-            prompt="guest@ted-yee-beer-house"
+            prompt={theme.brand.terminalPrompt}
+            promptPrefix={isPythonMode ? ">>>" : undefined}
+            hidePrompt={isVimMode}
+            inputClassName={isPythonMode || isVimMode ? "text-green-400" : undefined}
+            statusLine={isVimMode ? "-- INSERT -- (type :q! or :wq to escape)" : undefined}
             height="100%"
             className="h-full"
-            welcomeMessages={[
-              "🍺 Welcome to Ted-yee Beer House Terminal v2.0.0",
-              "Type 'help' for a list of commands.",
-              "Or just try whatever comes to mind... 😉",
-            ]}
+            welcomeMessages={theme.brand.welcomeMessages}
             onExit={onClose}
             headerControls={
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsMaximized(!isMaximized);
@@ -745,6 +546,7 @@ export default function BarTerminalOverlay({
                   )}
                 </button>
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onClose();

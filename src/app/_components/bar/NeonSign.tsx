@@ -2,21 +2,20 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useTheme } from "./theme";
 
 interface NeonSignProps {
   onBackronymReveal?: () => void;
 }
 
-const FULL_TEXT = "Ted-yee Beer House";
-const SUBTITLE_REVEAL = "Est. 2026 — Powered by Caffeine & Soju";
 const BACKRONYM_LINES = [
-  { letter: "T", rest: "ech" },
-  { letter: "E", rest: "nthusiast" },
+  { letter: "T", rest: "ired" },
+  { letter: "E", rest: "veryday" },
   { letter: "D", rest: "eveloper" },
   { letter: "-", rest: "" },
-  { letter: "Y", rest: "our" },
-  { letter: "E", rest: "veryday" },
-  { letter: "E", rest: "ngineer" },
+  { letter: "Y", rest: "et" },
+  { letter: "E", rest: "asily" },
+  { letter: "E", rest: "xcited" },
 ];
 
 type SignPhase =
@@ -29,6 +28,8 @@ type SignPhase =
   | "cooldown";
 
 export default function NeonSign({ onBackronymReveal }: NeonSignProps) {
+  const theme = useTheme();
+  const fullText = theme.brand.fullText;
   const [clickCount, setClickCount] = useState(0);
   const [phase, setPhase] = useState<SignPhase>("idle");
   const [offLetters, setOffLetters] = useState<Set<number>>(new Set());
@@ -55,11 +56,11 @@ export default function NeonSign({ onBackronymReveal }: NeonSignProps) {
       setPhase("flicker2");
       // Turn off random letters
       const indices = new Set<number>();
-      const textLen = FULL_TEXT.length;
+      const textLen = fullText.length;
       const count = 2 + Math.floor(Math.random() * 3);
       while (indices.size < count) {
         const idx = Math.floor(Math.random() * textLen);
-        if (FULL_TEXT[idx] !== " " && FULL_TEXT[idx] !== "-") indices.add(idx);
+        if (fullText[idx] !== " " && fullText[idx] !== "-") indices.add(idx);
       }
       setOffLetters(indices);
       setTimeout(() => {
@@ -68,16 +69,21 @@ export default function NeonSign({ onBackronymReveal }: NeonSignProps) {
       }, 800);
     } else if (next === 5) {
       setPhase("letters_off");
-      // Gradually turn off letters until only "Ted Beer" remains
       const keepIndices = new Set<number>();
-      "Ted".split("").forEach((_, i) => keepIndices.add(i)); // T=0, e=1, d=2
-      // Find "Beer" position
-      const beerStart = FULL_TEXT.indexOf("Beer");
-      "Beer".split("").forEach((_, i) => keepIndices.add(beerStart + i));
+      "Ted".split("").forEach((_, i) => {
+        keepIndices.add(i);
+      });
+      const lastWord = fullText.split(" ").pop() || "";
+      const lastWordStart = fullText.lastIndexOf(lastWord);
+      if (lastWordStart >= 0) {
+        lastWord.split("").forEach((_, i) => {
+          keepIndices.add(lastWordStart + i);
+        });
+      }
 
       const turnOffIndices: number[] = [];
-      for (let i = 0; i < FULL_TEXT.length; i++) {
-        if (!keepIndices.has(i) && FULL_TEXT[i] !== " ") turnOffIndices.push(i);
+      for (let i = 0; i < fullText.length; i++) {
+        if (!keepIndices.has(i) && fullText[i] !== " ") turnOffIndices.push(i);
       }
 
       // Animate turning off one by one
@@ -101,7 +107,7 @@ export default function NeonSign({ onBackronymReveal }: NeonSignProps) {
         resetSign();
       }, 5000);
     }
-  }, [clickCount, resetSign]);
+  }, [clickCount, fullText, resetSign]);
 
   // Ted-yee hover for backronym
   const handleTedYeeMouseEnter = useCallback(() => {
@@ -135,11 +141,43 @@ export default function NeonSign({ onBackronymReveal }: NeonSignProps) {
     if (phase === "flicker1") return "animate-neon-flicker-subtle";
     if (phase === "flicker2") return "animate-neon-flicker-heavy";
     if (phase === "spark_recovery") return "animate-neon-spark";
+    if (phase === "idle") return "animate-neon-breathe";
     return "";
   };
 
   return (
     <div className="relative flex flex-col items-center">
+      {/* Backronym tooltip — above the title, horizontal */}
+      {showBackronym && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute -top-14 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl px-5 py-2.5 font-mono text-sm z-50 whitespace-nowrap"
+        >
+          <div className="flex items-center gap-1">
+            {BACKRONYM_LINES.map((line, i) => (
+              <span
+                key={i}
+                className={`transition-opacity duration-300 ${
+                  i < backronymProgress ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {line.letter === "-" ? (
+                  <span className="text-gray-600 mx-1">—</span>
+                ) : (
+                  <>
+                    <span className="text-[#3994ef] font-bold">
+                      {line.letter}
+                    </span>
+                    <span className="text-gray-400">{line.rest}</span>
+                  </>
+                )}
+              </span>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       {/* Main neon sign */}
       <motion.div
         className="relative cursor-pointer select-none"
@@ -152,11 +190,11 @@ export default function NeonSign({ onBackronymReveal }: NeonSignProps) {
             textShadow:
               phase === "spark_recovery"
                 ? "0 0 40px #3994ef, 0 0 80px #3994ef, 0 0 120px #6366f1"
-                : "0 0 10px #3994ef80, 0 0 40px #3994ef40, 0 0 80px #3994ef20",
+                : "0 0 7px #3994ef80, 0 0 14px #3994ef60, 0 0 28px #3994ef40, 0 0 56px #3994ef20",
             transition: "text-shadow 0.3s",
           }}
         >
-          {FULL_TEXT.split("").map((char, i) => {
+          {fullText.split("").map((char, i) => {
             const isTedYee = i < 7; // "Ted-yee"
             return (
               <span
@@ -207,37 +245,8 @@ export default function NeonSign({ onBackronymReveal }: NeonSignProps) {
             textShadow: "0 0 10px #3994ef40",
           }}
         >
-          {SUBTITLE_REVEAL}
+          {theme.brand.subtitleReveal}
         </motion.p>
-      )}
-
-      {/* Backronym tooltip */}
-      {showBackronym && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-48 left-0 sm:left-4 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl p-4 font-mono text-sm z-50"
-        >
-          {BACKRONYM_LINES.map((line, i) => (
-            <div
-              key={i}
-              className={`transition-opacity duration-300 ${
-                i < backronymProgress ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {line.letter === "-" ? (
-                <span className="text-gray-600">—</span>
-              ) : (
-                <>
-                  <span className="text-[#3994ef] font-bold">
-                    {line.letter}
-                  </span>
-                  <span className="text-gray-400">{line.rest}</span>
-                </>
-              )}
-            </div>
-          ))}
-        </motion.div>
       )}
     </div>
   );

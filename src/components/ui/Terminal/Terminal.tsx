@@ -17,6 +17,10 @@ function TerminalComponent(
     headerControls,
     // height kept in interface for API compatibility; flex layout handles sizing internally
     className,
+    promptPrefix,
+    hidePrompt = false,
+    inputClassName,
+    statusLine,
   }: TerminalProps,
   ref: React.Ref<TerminalHandler>
 ) {
@@ -100,9 +104,18 @@ function TerminalComponent(
     return fns;
   }, [onExit]);
 
+  const currentPrompt = promptPrefix ?? `${prompt}$`;
+
   const runCommand = useCallback(async (cmdLine: string) => {
     const trimmedCommand = cmdLine.trim();
-    pushLine({ type: "input", text: `${prompt}$ ${trimmedCommand}` });
+    const inputEcho = hidePrompt
+      ? trimmedCommand
+      : `${currentPrompt}${trimmedCommand ? ` ${trimmedCommand}` : ""}`;
+
+    if (inputEcho) {
+      pushLine({ type: "input", text: inputEcho, className: inputClassName });
+    }
+
     if (!trimmedCommand) return;
     const [cmd, ...args] = tokenizeCommandLine(trimmedCommand);
 
@@ -138,7 +151,7 @@ function TerminalComponent(
     }
 
     pushLine({ type: "output", text: `Command not found: ${cmd}` });
-  }, [builtInFunctions, onCommand, prompt, pushLine, pushLines]);
+  }, [builtInFunctions, currentPrompt, hidePrompt, inputClassName, onCommand, pushLine, pushLines]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (readRequest) {
@@ -173,7 +186,12 @@ function TerminalComponent(
     }
 
     if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
-      pushLine({ type: "system", text: `${prompt}$ ${userInput}` });
+      const interruptedText = hidePrompt
+        ? userInput
+        : `${currentPrompt}${userInput ? ` ${userInput}` : ""}`;
+      if (interruptedText) {
+        pushLine({ type: "system", text: interruptedText });
+      }
       setUserInput("");
       historyIndexRef.current = -1;
       return;
@@ -238,16 +256,25 @@ function TerminalComponent(
             key={i}
             className={cn(
               "whitespace-pre-wrap leading-6",
-              l.type === "input" ? "text-gray-400" : "text-green-400"
+              l.type === "input" ? "text-gray-400" : "text-green-400",
+              l.className
             )}
           >
             {l.text}
           </div>
         ))}
 
+
         <div className="flex items-center gap-2 text-white">
-          {!readRequest?.isSecret && (
-            <span className="text-gray-400 select-none flex-shrink-0 whitespace-nowrap">{prompt}$</span>
+          {!readRequest?.isSecret && !hidePrompt && (
+            <span
+              className={cn(
+                "select-none flex-shrink-0 whitespace-nowrap",
+                promptPrefix ? "text-green-400" : "text-gray-400"
+              )}
+            >
+              {currentPrompt}
+            </span>
           )}
           <input
             ref={inputRef}
@@ -258,9 +285,18 @@ function TerminalComponent(
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
-            className="flex-1 bg-transparent border-none outline-none focus:ring-0 placeholder-gray-600 caret-gray-400"
+            className={cn(
+              "flex-1 bg-transparent border-none outline-none focus:ring-0 placeholder-gray-600 caret-gray-400",
+              inputClassName
+            )}
           />
         </div>
+
+        {statusLine && (
+          <div className="whitespace-pre-wrap leading-6 text-gray-400 select-none">
+            {statusLine}
+          </div>
+        )}
       </div>
     </div>
   );

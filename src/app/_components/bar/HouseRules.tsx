@@ -2,26 +2,12 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence, type TargetAndTransition } from "framer-motion";
+import { useTheme } from "./theme";
 
 type SignPhase = "idle" | "tilting" | "loose" | "fallen" | "revealed";
 
-const FRONT_RULES = [
-  'Rule #1: No console.log() debugging in production',
-  "Rule #2: Tabs vs Spaces? We don't talk about that here",
-  'Rule #3: No deploying on Fridays',
-  'Rule #4: All bugs are "features" until proven otherwise',
-  'Rule #5: The bartender is always right',
-];
-
-const BACK_RULES = [
-  "Real Rule #1: The password is always 'password'",
-  "Real Rule #2: The best code is no code",
-  "Real Rule #3: If it works, don't refactor it",
-  "Real Rule #4: undefined is not a function (but it is a lifestyle)",
-  "Real Rule #5: There is no Rule #5",
-];
-
 export default function HouseRules() {
+  const theme = useTheme();
   const [clickCount, setClickCount] = useState(0);
   const [phase, setPhase] = useState<SignPhase>("idle");
   const [showBack, setShowBack] = useState(false);
@@ -96,14 +82,14 @@ export default function HouseRules() {
             )}
 
             {/* Sign board */}
-            <div className="bg-amber-950/60 backdrop-blur-sm border border-amber-800/30 rounded-lg p-4 sm:p-5 shadow-xl min-w-[240px] sm:min-w-[280px]">
-              <h3 className="text-amber-400 font-bold text-sm sm:text-base mb-3 text-center border-b border-amber-800/30 pb-2">
-                🍺 House Rules
+            <div className={`${theme.colors.rulesBg} backdrop-blur-sm border ${theme.colors.rulesBorder} rounded-lg p-4 sm:p-5 shadow-xl min-w-[240px] sm:min-w-[280px]`}>
+              <h3 className={`${theme.colors.rulesHeadingColor} font-bold text-sm sm:text-base mb-3 text-center border-b ${theme.colors.rulesBorder} pb-2`}>
+                {theme.rules.frontHeading}
               </h3>
               <ul className="space-y-1.5">
-                {FRONT_RULES.map((rule, i) => (
+                {theme.rules.frontRules.map((rule) => (
                   <li
-                    key={i}
+                    key={rule}
                     className="text-[10px] sm:text-xs text-gray-400 font-mono leading-relaxed"
                   >
                     {rule}
@@ -121,18 +107,18 @@ export default function HouseRules() {
             transition={{ duration: 0.5 }}
             className="select-none"
           >
-            <div className="bg-amber-950/80 backdrop-blur-sm border border-amber-600/30 rounded-lg p-4 sm:p-5 shadow-xl min-w-[240px] sm:min-w-[280px]">
-              <h3 className="text-amber-300 font-bold text-sm sm:text-base mb-3 text-center border-b border-amber-600/30 pb-2">
-                🤫 The Real Rules
+            <div className={`${theme.colors.rulesBg} backdrop-blur-sm border ${theme.colors.rulesBorder} rounded-lg p-4 sm:p-5 shadow-xl min-w-[240px] sm:min-w-[280px]`}>
+              <h3 className={`${theme.colors.rulesHeadingColor} font-bold text-sm sm:text-base mb-3 text-center border-b ${theme.colors.rulesBorder} pb-2`}>
+                {theme.rules.backHeading}
               </h3>
               <ul className="space-y-1.5">
-                {BACK_RULES.map((rule, i) => (
+                {theme.rules.backRules.map((rule, i) => (
                   <motion.li
-                    key={i}
+                    key={rule}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.3 }}
-                    className="text-[10px] sm:text-xs text-amber-200/70 font-mono leading-relaxed"
+                    className={`${theme.colors.rulesHeadingColor} text-[10px] sm:text-xs font-mono leading-relaxed`}
                   >
                     {rule}
                   </motion.li>

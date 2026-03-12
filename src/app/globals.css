@@ -71,6 +71,15 @@
   animation: neon-spark 0.6s ease-out;
 }
 
+@keyframes neon-breathe {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.9; filter: brightness(0.85); }
+}
+
+.animate-neon-breathe {
+  animation: neon-breathe 4s ease-in-out infinite;
+}
+
 /* Rain animation */
 @keyframes rain-fall {
   0% { transform: translateY(-10px); opacity: 0; }

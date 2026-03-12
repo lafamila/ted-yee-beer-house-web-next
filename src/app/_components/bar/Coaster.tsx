@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { useTheme } from "./theme";
 
 type CoasterPhase = "idle" | "spinning" | "flying" | "gone" | "returning";
 
@@ -14,6 +16,7 @@ const HIDDEN_MESSAGES = [
 ];
 
 export default function Coaster() {
+  const theme = useTheme();
   const [clickCount, setClickCount] = useState(0);
   const [phase, setPhase] = useState<CoasterPhase>("idle");
   const [spinSpeed, setSpinSpeed] = useState(0);
@@ -78,17 +81,23 @@ export default function Coaster() {
             whileHover={{ scale: 1.05 }}
           >
             {/* Coaster visual */}
-            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-gradient-to-br from-amber-900/60 to-amber-800/40 border-2 border-amber-700/30 flex items-center justify-center shadow-lg relative overflow-hidden">
+            <div
+              className={cn(
+                "w-28 h-28 sm:w-36 sm:h-36 rounded-full border-2 flex items-center justify-center shadow-lg relative overflow-hidden",
+                theme.colors.coasterGradient,
+                theme.colors.coasterBorder
+              )}
+            >
               {/* Cork texture pattern */}
               <div className="absolute inset-2 rounded-full border border-amber-600/20" />
               <div className="absolute inset-4 rounded-full border border-amber-600/10" />
               {/* Center text */}
               <div className="text-center z-10">
-                <span className="text-amber-400/80 text-xs font-mono block">
-                  TED-YEE
+                <span className={cn("text-xs font-mono block", theme.colors.coasterTextColor1)}>
+                  {theme.brand.coasterLine1}
                 </span>
-                <span className="text-amber-500/60 text-[10px] font-mono block">
-                  BEER HOUSE
+                <span className={cn("text-[10px] font-mono block", theme.colors.coasterTextColor2)}>
+                  {theme.brand.coasterLine2}
                 </span>
               </div>
               {/* Wet ring stain */}

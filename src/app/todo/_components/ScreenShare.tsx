@@ -91,14 +91,10 @@ export default function ScreenShare() {
     },
     onShareStopped: () => {
       setIsViewerOpen(false);
+      setToastMessage(null);
     },
   });
 
-  useEffect(() => {
-    if (!toastMessage) return;
-    const timeout = window.setTimeout(() => setToastMessage(null), 5000);
-    return () => window.clearTimeout(timeout);
-  }, [toastMessage]);
 
   useEffect(() => {
     if (!projectId) {
@@ -256,7 +252,7 @@ export default function ScreenShare() {
     void viewerShellRef.current.requestFullscreen();
   }, []);
 
-  const startDrag = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+  const startDrag = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!viewerRect) return;
     dragStateRef.current = {
       type: 'drag',
@@ -370,7 +366,7 @@ export default function ScreenShare() {
             <button
               type="button"
               onClick={handleJoinViewer}
-              className="rounded-md border border-emerald-500/60 bg-emerald-600/20 px-3 py-1.5 text-sm font-medium text-emerald-200 transition-colors hover:bg-emerald-500/30"
+              className="rounded-md border border-emerald-500 bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
             >
               참가하기
             </button>
@@ -380,7 +376,7 @@ export default function ScreenShare() {
             <button
               type="button"
               onClick={() => void handleStopShare()}
-              className="rounded-md border border-red-500/60 bg-red-600/20 px-3 py-1.5 text-sm font-medium text-red-200 transition-colors hover:bg-red-500/30"
+              className="rounded-md border border-red-500 bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
             >
               공유 중지
             </button>
@@ -409,18 +405,13 @@ export default function ScreenShare() {
             height: viewerRect.height,
           }}
         >
-          <div className="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-2">
-            <button
-              type="button"
-              onMouseDown={startDrag}
-              className="cursor-move text-xs text-gray-200"
-            >
-              공유 화면
-            </button>
+          <div className="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-2 cursor-move" onMouseDown={startDrag}>
+            <span className="text-xs text-gray-200 select-none">공유 화면</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleFullScreen}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="rounded border border-gray-600 px-2 py-1 text-xs text-gray-200 hover:bg-gray-700"
               >
                 전체화면
@@ -428,6 +419,7 @@ export default function ScreenShare() {
               <button
                 type="button"
                 onClick={handleExitViewer}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="rounded border border-red-500/50 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20"
               >
                 나가기

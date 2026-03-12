@@ -1,5 +1,5 @@
 export type CommandLineType = "output" | "input" | "system";
-export type CommandLine = { type: CommandLineType; text: string };
+export type CommandLine = { type: CommandLineType; text: string; className?: string };
 export type CommandResult =
   | string
   | string[]
@@ -46,6 +46,11 @@ export interface TerminalProps {
   height?: number | string;
   /** Additional CSS class for the outermost container */
   className?: string;
+  promptPrefix?: string;
+  hidePrompt?: boolean;
+  inputClassName?: string;
+  /** Fixed status line rendered above the input (e.g. vim's "-- INSERT --") */
+  statusLine?: string;
 }
 
 // Project 관련 타입
