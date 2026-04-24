@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 @layer base {
   body {
@@ -141,4 +142,120 @@
   background: var(--vip-tint);
   pointer-events: none;
   z-index: 1;
+}
+
+.travel-map-frame {
+  height: 520px;
+}
+
+.travel-map {
+  height: 100%;
+  width: 100%;
+}
+
+.travel-map {
+  position: relative;
+  overflow: hidden;
+}
+
+.travel-map .maplibregl-map {
+  height: 100%;
+  width: 100%;
+  font-family: inherit;
+}
+
+.travel-map .maplibregl-ctrl-bottom-left,
+.travel-map .maplibregl-ctrl-bottom-right {
+  z-index: 10;
+}
+
+.travel-map .maplibregl-ctrl-group {
+  background: rgba(4, 10, 18, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.travel-map .maplibregl-ctrl button .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+
+.travel-marker-shell {
+  background: transparent;
+  border: 0;
+}
+
+.travel-marker {
+  min-width: 112px;
+  border-radius: 16px 16px 16px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(4, 10, 18, 0.92);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+  color: white;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.travel-marker__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.travel-marker__meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  opacity: 0.66;
+}
+
+.travel-marker--food {
+  border-color: rgba(253, 186, 116, 0.6);
+}
+
+.travel-marker--coffee {
+  border-color: rgba(196, 181, 253, 0.6);
+}
+
+.travel-marker--bar {
+  border-color: rgba(251, 146, 60, 0.6);
+}
+
+.travel-marker--culture {
+  border-color: rgba(147, 197, 253, 0.6);
+}
+
+.travel-marker--nature {
+  border-color: rgba(110, 231, 183, 0.6);
+}
+
+.travel-marker--shopping {
+  border-color: rgba(244, 114, 182, 0.6);
+}
+
+.travel-marker--stay {
+  border-color: rgba(129, 140, 248, 0.6);
+}
+
+.travel-marker--other {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.travel-marker--active {
+  background: rgba(125, 211, 252, 0.92);
+  border-color: rgba(125, 211, 252, 1);
+  color: rgba(8, 16, 28, 0.95);
+}
+
+.travel-marker--multi {
+  background: rgba(253, 224, 71, 0.92);
+  border-color: rgba(253, 224, 71, 1);
+  color: rgba(8, 16, 28, 0.95);
+}
+
+.travel-marker--draft {
+  background: rgba(248, 250, 252, 0.95);
+  border-color: rgba(248, 250, 252, 1);
+  color: rgba(15, 23, 42, 0.95);
 }

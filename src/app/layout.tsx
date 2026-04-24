@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
-import { AppProvider } from "@/contexts/AppContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
 
@@ -23,14 +22,12 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.className} antialiased font-sans min-h-screen bg-black text-white selection:bg-[#3994ef] selection:text-white relative`}>
         <BackgroundEffect />
         <AuthProvider>
-          <AppProvider>
+          {children}
+          {/* <Header /> */}
+          {/* <main className="pt-14 pb-10">
             {children}
-            {/* <Header /> */}
-            {/* <main className="pt-14 pb-10">
-              {children}
-            </main> */}
-            {/* <Footer /> */}
-          </AppProvider>
+          </main> */}
+          {/* <Footer /> */}
         </AuthProvider>
       </body>
     </html>

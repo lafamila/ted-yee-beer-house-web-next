@@ -1,5 +1,6 @@
 'use client';
 
+import { AppProvider } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -41,5 +42,5 @@ export default function TodoLayout({
     return null;
   }
 
-  return <>{children}</>;
+  return <AppProvider>{children}</AppProvider>;
 }

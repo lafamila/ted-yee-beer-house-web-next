@@ -190,6 +190,45 @@ export interface UserInterface {
   username: string;
   displayName: string;
   isAdmin: boolean;
+  isSuperAdmin?: boolean;
+}
+
+// Daily Task Tracker 타입
+export interface CalendarDayInterface {
+  date: string;
+  completedCount: number;
+  totalCount: number;
+  ratio: number;
+}
+
+export interface CalendarMonthInterface {
+  year: number;
+  month: number;
+  totalTaskTypes: number;
+  days: CalendarDayInterface[];
+}
+
+export interface DailyTaskTypeInterface {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DayDetailTaskInterface {
+  taskTypeId: string;
+  name: string;
+  icon: string;
+  completed: boolean;
+}
+
+export interface DayDetailInterface {
+  date: string;
+  tasks: DayDetailTaskInterface[];
 }
 
 export interface LoginResponseInterface {
@@ -207,4 +246,166 @@ export interface ProjectMemberInterface {
   username: string;
   displayName: string;
   isAdmin: boolean;
+}
+
+export type TravelPlaceCategory =
+  | "food"
+  | "coffee"
+  | "bar"
+  | "culture"
+  | "nature"
+  | "shopping"
+  | "stay"
+  | "other";
+
+export interface TravelPlaceInterface {
+  id: string;
+  category: TravelPlaceCategory;
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string | null;
+  description?: string | null;
+  openingHours?: string | null;
+  specialNotes?: string | null;
+  coverImageUrl?: string | null;
+  photoUrls: string[];
+  tags: string[];
+  reviews: TravelReviewInterface[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TravelReviewInterface {
+  id: string;
+  placeId: string;
+  rating: number;
+  headline?: string | null;
+  body: string;
+  visitedAt?: string | null;
+  photoUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TravelCourseStopInterface {
+  placeId: string;
+  placeName: string;
+  order: number;
+  scheduledAt?: string | null;
+  note?: string | null;
+  reasoningText?: string | null;
+  transitHint?: string | null;
+}
+
+export interface TravelCourseInterface {
+  id: string;
+  title: string;
+  startLocation?: string | null;
+  tripStartAt?: string | null;
+  tripEndAt?: string | null;
+  transportMode?: string | null;
+  summary?: string | null;
+  promptText?: string | null;
+  outputFormatVersion: string;
+  stops: TravelCourseStopInterface[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TravelPlaceRequestInterface {
+  name: string;
+  category: TravelPlaceCategory;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  description?: string;
+  openingHours?: string;
+  specialNotes?: string;
+  coverImageUrl?: string;
+  photoUrls?: string[];
+  tags?: string[];
+}
+
+export interface TravelReviewRequestInterface {
+  rating: number;
+  headline?: string;
+  body: string;
+  visitedAt?: string;
+  photoUrls?: string[];
+}
+
+export interface TravelUploadedFileInterface {
+  key: string;
+  url: string;
+  contentType: string;
+  filename: string;
+}
+
+export interface TravelSelectedPlaceInterface {
+  placeId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  openingHours?: string;
+  specialNotes?: string;
+  coverImageUrl?: string;
+  reviewSummary?: string[];
+}
+
+export interface TravelCourseExportRequestInterface {
+  tripWindow: {
+    startAt: string;
+    endAt: string;
+  };
+  courseStart: {
+    label?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  selectedPlaces: TravelSelectedPlaceInterface[];
+  selectionContext?: Record<string, string>;
+}
+
+export interface TravelCourseExportResponseInterface {
+  outputFormatVersion: string;
+  payload: Record<string, unknown>;
+  promptText: string;
+}
+
+export interface TravelCourseImportPayloadInterface {
+  outputFormatVersion: string;
+  course: {
+    title: string;
+    startLocation?: string;
+    tripWindow?: {
+      startAt?: string;
+      endAt?: string;
+    };
+    transportMode?: string;
+    summary?: string;
+    promptText?: string;
+    stops: Array<{
+      placeId: string;
+      placeName: string;
+      scheduledAt?: string;
+      note?: string;
+      reasoningText?: string;
+      transitHint?: string;
+    }>;
+  };
+  validation?: Record<string, unknown>;
+}
+
+export interface GoogleMapsLinkResolutionInterface {
+  resolvedUrl: string;
+  googlePlaceId?: string | null;
+  googleMapsUri?: string | null;
+  name: string;
+  address?: string | null;
+  latitude: number;
+  longitude: number;
+  openingHours?: string | null;
+  primaryType?: string | null;
 }

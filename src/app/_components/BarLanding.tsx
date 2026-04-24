@@ -1,21 +1,200 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import { motion } from "framer-motion";
-import { Terminal as TerminalIcon, Github, Mail, Linkedin } from "lucide-react";
+import { GithubIcon, LinkedinIcon, Mail, Terminal as TerminalIcon } from "lucide-react";
 import NeonSign from "./bar/NeonSign";
 import BeerGlass from "./bar/BeerGlass";
-import CoffeeCup from "./bar/CoffeeCup";
 import Coaster from "./bar/Coaster";
 import HouseRules from "./bar/HouseRules";
 import BarTab from "./bar/BarTab";
 import WeatherWindow from "./bar/WeatherWindow";
 import WeatherBackground from "./bar/WeatherBackground";
-import BarTerminalOverlay, { BAR_SECTIONS, type BarSectionId } from "./bar/BarTerminalOverlay";
+import BarTerminalOverlay, {
+  BAR_SECTIONS,
+  type BarSectionId,
+} from "./bar/BarTerminalOverlay";
 import VIPMenu from "./bar/VIPMenu";
 import { useWeather } from "./bar/useWeather";
 import { useKonamiCode } from "./bar/useKonamiCode";
 import { ThemeProvider, useTheme } from "./bar/theme";
+import TeddyAdventureGame from "./bar/game/TeddyAdventureGame";
+import TeddyInventory from "./bar/game/TeddyInventory";
+import type {
+  BartenderReaction,
+  ExternalDragItemId,
+  GameChoice,
+  GameDialogueState,
+  GameSceneObjectId,
+  InventoryItem,
+} from "./bar/game/types";
+
+type ChoiceContext = "bartender-menu" | "order-menu" | null;
+type ExternalFocus =
+  | "menu-board"
+  | "house-rules"
+  | "drink-station"
+  | "weather-window"
+  | null;
+
+interface StoryFlags {
+  introduced: boolean;
+  bellFound: boolean;
+  frameSeen: boolean;
+  guestBookRead: boolean;
+  beerDelivered: boolean;
+  coasterDelivered: boolean;
+  forecastDelivered: boolean;
+}
+
+const BARTENDER_CHOICES: GameChoice[] = [
+  { id: "talk", label: "1. Talk", hint: "See what Teddy says now" },
+  { id: "order", label: "2. Order", hint: "Use the click-friendly order menu" },
+  { id: "cancel", label: "3. Cancel", hint: "Back away politely" },
+];
+
+const ORDER_CHOICES: GameChoice[] = [
+  { id: "beer", label: "Beer", hint: "Safe, cold, and easy" },
+  { id: "soju", label: "Soju", hint: "Sharper and more direct" },
+  { id: "highball", label: "Highball", hint: "Smooth late-night option" },
+  { id: "back", label: "Back", hint: "Return to Teddy" },
+];
+
+const TALK_DIALOGUES = {
+  intro: [
+    "So you're the one wandering around after hours.",
+    "I'm Teddy. I keep the bar running after dark and the build green before sunrise.",
+    "Click around, bring me anything interesting, and I might show you the better stories.",
+  ],
+  low: [
+    [
+      "The trick is keeping one eye on the code and the other on the room.",
+      "Both break if you ignore the quiet details for too long.",
+    ],
+    [
+      "Regulars think this place is cozy by accident.",
+      "Developers know every cozy thing is secretly a lot of state management.",
+    ],
+  ],
+  mid: [
+    [
+      "You move like someone who reads changelogs for fun.",
+      "That's either promising or dangerous. Usually both.",
+    ],
+    [
+      "The terminal gets louder the longer you stay.",
+      "Good sign. Means the room has decided to trust you a little.",
+    ],
+  ],
+  high: [
+    [
+      "At this point you're not just visiting.",
+      "You're helping the place remember what kind of night it wants to be.",
+    ],
+    [
+      "Funny thing about affection meters: they look gamey, but people notice effort the same way.",
+      "You keep bringing the right energy and the dialogue tree opens itself.",
+    ],
+  ],
+};
+
+const IDLE_LINES = {
+  low: [
+    "If you need a hint, start by clicking me or the service bell.",
+    "The easy order menu tops out early. The terminal is where the gremlin energy lives.",
+    "Some of the room likes being handed back to me instead of just clicked.",
+  ],
+  high: [
+    "You know the room better now. Try feeding Teddy a prop from outside the game.",
+    "The bar keeps notes on people who pay attention. Check the inventory if you missed one.",
+    "If the terminal opens, I stop pretending this is just a normal shift.",
+  ],
+};
+
+const EXTERNAL_FOCUS_LABELS: Record<Exclude<ExternalFocus, null>, string> = {
+  "menu-board": "Teddy keeps glancing toward the menu board.",
+  "house-rules": "Teddy is waiting for the rules sign to stop swinging.",
+  "drink-station": "Teddy notices you hovering around the drink station.",
+  "weather-window": "Teddy checks the weather outside while he talks.",
+};
+
+const DROP_REWARDS: Record<ExternalDragItemId, InventoryItem> = {
+  "beer-glass": {
+    id: "foam-blueprint",
+    name: "Foam Blueprint",
+    emoji: "🍺",
+    description: "A sketch Teddy made after you handed over the beer glass setup.",
+    source: "beer glass delivery",
+  },
+  coaster: {
+    id: "coaster-glitch",
+    name: "Coaster Glitch",
+    emoji: "🥏",
+    description: "A coaster with notes on hidden jokes and one suspicious Wi-Fi clue.",
+    source: "coaster delivery",
+  },
+  "weather-note": {
+    id: "forecast-postcard",
+    name: "Forecast Postcard",
+    emoji: "🌦️",
+    description: "A pocket-sized reminder that mood and weather change the whole room.",
+    source: "weather window delivery",
+  },
+};
+
+const SCENE_REWARDS: Partial<Record<GameSceneObjectId, InventoryItem>> = {
+  "service-bell": {
+    id: "brass-chip",
+    name: "Brass Bell Chip",
+    emoji: "🔔",
+    description: "Proof you found the fastest way to get Teddy's attention.",
+    source: "service bell",
+  },
+  "guest-book": {
+    id: "guest-log",
+    name: "Guest Log Stub",
+    emoji: "📓",
+    description: "A torn page full of names, side projects, and one lucky typo.",
+    source: "guest log",
+  },
+  "wall-frame": {
+    id: "night-shift-photo",
+    name: "Night Shift Photo",
+    emoji: "🖼️",
+    description: "A little frame reminding you Teddy has always lived between craft and code.",
+    source: "wall frame",
+  },
+};
+
+function createEmptyDialogue(): GameDialogueState {
+  return {
+    visible: false,
+    speaker: "Teddy",
+    lines: [],
+    index: 0,
+    mode: "story",
+    choices: [],
+  };
+}
+
+function pickRandom<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)] ?? items[0];
+}
+
+function getAffectionLabel(score: number): string {
+  if (score <= 1) return "Still sizing you up";
+  if (score <= 3) return "Curious regular energy";
+  if (score <= 5) return "Trusted after-hours regular";
+  return "Favorite person on the late shift";
+}
 
 export default function BarLanding() {
   return (
@@ -32,17 +211,94 @@ function BarLandingContent() {
   const [elapsed, setElapsed] = useState(0);
   const [hiddenSections, setHiddenSections] = useState<Set<BarSectionId>>(new Set());
   const [drunkAngles, setDrunkAngles] = useState<Partial<Record<BarSectionId, number>>>({});
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [affection, setAffection] = useState(1);
+  const [dialogue, setDialogue] = useState<GameDialogueState>(createEmptyDialogue());
+  const [choiceContext, setChoiceContext] = useState<ChoiceContext>(null);
+  const [gameStatusText, setGameStatusText] = useState(
+    "Teddy is polishing a glass and waiting to see what kind of player you are."
+  );
+  const [externalFocus, setExternalFocus] = useState<ExternalFocus>(null);
+  const [reactionOverride, setReactionOverride] = useState<BartenderReaction | null>(null);
+  const [gameOrderCount, setGameOrderCount] = useState(0);
+  const [storyFlags, setStoryFlags] = useState<StoryFlags>({
+    introduced: false,
+    bellFound: false,
+    frameSeen: false,
+    guestBookRead: false,
+    beerDelivered: false,
+    coasterDelivered: false,
+    forecastDelivered: false,
+  });
   const drunkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const drunkStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drunkIntensityRef = useRef(0);
   const deleteTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const ambientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dialogueCompleteRef = useRef<(() => void) | null>(null);
+  const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const weather = useWeather();
   const { isVIP, reset: resetVIP } = useKonamiCode();
+
+  const affectionLabel = useMemo(() => getAffectionLabel(affection), [affection]);
 
   const clearDeleteTimers = useCallback(() => {
     deleteTimersRef.current.forEach(clearTimeout);
     deleteTimersRef.current = [];
   }, []);
+
+  const clearAmbientTimer = useCallback(() => {
+    if (ambientTimerRef.current) {
+      clearTimeout(ambientTimerRef.current);
+      ambientTimerRef.current = null;
+    }
+  }, []);
+
+  const closeDialogue = useCallback(() => {
+    clearAmbientTimer();
+    setDialogue(createEmptyDialogue());
+    setChoiceContext(null);
+
+    const complete = dialogueCompleteRef.current;
+    dialogueCompleteRef.current = null;
+    complete?.();
+  }, [clearAmbientTimer]);
+
+  const showDialogue = useCallback(
+    ({
+      speaker = "Teddy",
+      lines,
+      choices = [],
+      mode = "story",
+      onComplete,
+    }: {
+      speaker?: string;
+      lines: string[];
+      choices?: GameChoice[];
+      mode?: GameDialogueState["mode"];
+      onComplete?: () => void;
+    }) => {
+      clearAmbientTimer();
+      dialogueCompleteRef.current = onComplete ?? null;
+      setDialogue({
+        visible: true,
+        speaker,
+        lines,
+        index: 0,
+        mode,
+        choices,
+      });
+
+      if (mode === "ambient") {
+        ambientTimerRef.current = setTimeout(() => {
+          setDialogue((prev) => (prev.mode === "ambient" ? createEmptyDialogue() : prev));
+          dialogueCompleteRef.current = null;
+          ambientTimerRef.current = null;
+        }, 4300);
+      }
+    },
+    [clearAmbientTimer]
+  );
 
   const sectionStyle = useCallback(
     (sectionId: BarSectionId) => {
@@ -59,6 +315,26 @@ function BarLandingContent() {
     [hiddenSections, drunkAngles]
   );
 
+  const addAffection = useCallback((amount: number) => {
+    setAffection((prev) => Math.max(1, Math.min(7, prev + amount)));
+  }, []);
+
+  const addInventoryItem = useCallback((item: InventoryItem) => {
+    setInventory((prev) => (prev.some((existing) => existing.id === item.id) ? prev : [...prev, item]));
+  }, []);
+
+  const setTemporaryReaction = useCallback((reaction: BartenderReaction, duration = 2600) => {
+    if (reactionTimerRef.current) {
+      clearTimeout(reactionTimerRef.current);
+    }
+
+    setReactionOverride(reaction);
+    reactionTimerRef.current = setTimeout(() => {
+      setReactionOverride(null);
+      reactionTimerRef.current = null;
+    }, duration);
+  }, []);
+
   const stopDrunkEffect = useCallback(() => {
     if (drunkIntervalRef.current) {
       clearInterval(drunkIntervalRef.current);
@@ -72,68 +348,332 @@ function BarLandingContent() {
     setDrunkAngles({});
   }, []);
 
-  const handleDrunkEffect = useCallback((drinkCount: number) => {
-    // Scale max angle with drink count: 2→1.5°, 3→2.5°, 4→3.5°, 5+→4.5°
-    const maxAngle = Math.min(1 + drinkCount * 0.75, 5);
-    drunkIntensityRef.current = maxAngle;
+  const handleDrunkEffect = useCallback(
+    (drinkCount: number) => {
+      const maxAngle = Math.min(1 + drinkCount * 0.75, 5);
+      drunkIntensityRef.current = maxAngle;
+      setGameStatusText("The room shivers from one too many terminal orders. Teddy braces against the counter.");
+      setTemporaryReaction("busy", 3200);
 
-    // Start interval if not already running
-    if (!drunkIntervalRef.current) {
-      // Set initial angles immediately
-      const initial = BAR_SECTIONS.reduce<Partial<Record<BarSectionId, number>>>((acc, sectionId) => {
-        acc[sectionId] = Number((Math.random() * maxAngle * 2 - maxAngle).toFixed(2));
-        return acc;
-      }, {});
-      setDrunkAngles(initial);
-
-      drunkIntervalRef.current = setInterval(() => {
-        const intensity = drunkIntensityRef.current;
-        const nextAngles = BAR_SECTIONS.reduce<Partial<Record<BarSectionId, number>>>((acc, sectionId) => {
-          acc[sectionId] = Number((Math.random() * intensity * 2 - intensity).toFixed(2));
+      if (!drunkIntervalRef.current) {
+        const initial = BAR_SECTIONS.reduce<Partial<Record<BarSectionId, number>>>((acc, sectionId) => {
+          acc[sectionId] = Number((Math.random() * maxAngle * 2 - maxAngle).toFixed(2));
           return acc;
         }, {});
-        setDrunkAngles(nextAngles);
-      }, 1000);
-    }
+        setDrunkAngles(initial);
 
-    // Reset the stop timer (extends drunk duration on more drinks)
-    if (drunkStopTimerRef.current) {
-      clearTimeout(drunkStopTimerRef.current);
-    }
-    drunkStopTimerRef.current = setTimeout(() => {
-      stopDrunkEffect();
-    }, 8000);
-  }, [stopDrunkEffect]);
+        drunkIntervalRef.current = setInterval(() => {
+          const intensity = drunkIntensityRef.current;
+          const nextAngles = BAR_SECTIONS.reduce<Partial<Record<BarSectionId, number>>>((acc, sectionId) => {
+            acc[sectionId] = Number((Math.random() * intensity * 2 - intensity).toFixed(2));
+            return acc;
+          }, {});
+          setDrunkAngles(nextAngles);
+        }, 1000);
+      }
 
-  const handleDeleteEffect = useCallback((sections: string[], onComplete: () => void) => {
-    clearDeleteTimers();
+      if (drunkStopTimerRef.current) {
+        clearTimeout(drunkStopTimerRef.current);
+      }
+      drunkStopTimerRef.current = setTimeout(() => {
+        stopDrunkEffect();
+      }, 8000);
+    },
+    [setTemporaryReaction, stopDrunkEffect]
+  );
 
-    if (sections.length === 0) {
+  const handleDeleteEffect = useCallback(
+    (sections: string[], onComplete: () => void) => {
+      clearDeleteTimers();
+      setTemporaryReaction("busy", 2200);
+      setGameStatusText("Teddy watches the room vanish piece by piece, then pretends none of it happened.");
+
+      if (sections.length === 0) {
+        setHiddenSections(new Set());
+        onComplete();
+        return;
+      }
+
       setHiddenSections(new Set());
-      onComplete();
+
+      sections.forEach((sectionId, index) => {
+        const timeoutId = setTimeout(() => {
+          setHiddenSections((prev) => {
+            const next = new Set(prev);
+            if (BAR_SECTIONS.includes(sectionId as BarSectionId)) {
+              next.add(sectionId as BarSectionId);
+            }
+            return next;
+          });
+
+          if (index === sections.length - 1) {
+            onComplete();
+          }
+        }, index * 400);
+
+        deleteTimersRef.current.push(timeoutId);
+      });
+    },
+    [clearDeleteTimers, setTemporaryReaction]
+  );
+
+  const openBartenderMenu = useCallback(() => {
+    setChoiceContext("bartender-menu");
+    setTemporaryReaction(affection >= 4 ? "warm" : "curious", 2200);
+    showDialogue({
+      lines: [
+        affection >= 5
+          ? "You again. Good. Pick what kind of trouble we're doing this time."
+          : "Teddy sets a clean glass down and waits for your move.",
+      ],
+      choices: BARTENDER_CHOICES,
+    });
+  }, [affection, setTemporaryReaction, showDialogue]);
+
+  const runTalkScenario = useCallback(() => {
+    const lines = !storyFlags.introduced
+      ? TALK_DIALOGUES.intro
+      : affection >= 6
+        ? pickRandom(TALK_DIALOGUES.high)
+        : affection >= 4
+          ? pickRandom(TALK_DIALOGUES.mid)
+          : pickRandom(TALK_DIALOGUES.low);
+
+    if (!storyFlags.introduced) {
+      setStoryFlags((prev) => ({ ...prev, introduced: true }));
+      addAffection(1);
+      setGameStatusText("Teddy finally introduces himself like he expected you to stay.");
+    } else {
+      setGameStatusText("Talking with Teddy opens up another branch of the night shift.");
+    }
+
+    setChoiceContext(null);
+    setTemporaryReaction(affection >= 4 ? "warm" : "curious", 2800);
+    showDialogue({ lines });
+  }, [addAffection, affection, setTemporaryReaction, showDialogue, storyFlags.introduced]);
+
+  const handleSceneObjectClick = useCallback(
+    (objectId: GameSceneObjectId) => {
+      if (objectId === "service-bell") {
+        if (!storyFlags.bellFound) {
+          setStoryFlags((prev) => ({ ...prev, bellFound: true }));
+          addInventoryItem(SCENE_REWARDS[objectId]!);
+          addAffection(1);
+        }
+        setGameStatusText("The brass bell rings once. Teddy is instantly paying attention.");
+        setTemporaryReaction("curious", 2200);
+        showDialogue({
+          lines: [
+            "That bell's mostly for dramatic entrances.",
+            "Still, now I know you're serious about exploring.",
+          ],
+        });
+        return;
+      }
+
+      if (objectId === "terminal-note") {
+        setGameStatusText("Teddy nudges you toward the real terminal for the stronger commands.");
+        setTemporaryReaction("serious", 2800);
+        setIsTerminalOpen(true);
+        showDialogue({
+          lines: [
+            "The easy-click menu only goes so far.",
+            "If you want the riskier route, use the terminal. That's where the real bar keeps its secrets.",
+          ],
+        });
+        return;
+      }
+
+      if (objectId === "guest-book") {
+        if (!storyFlags.guestBookRead) {
+          setStoryFlags((prev) => ({ ...prev, guestBookRead: true }));
+          addInventoryItem(SCENE_REWARDS[objectId]!);
+          addAffection(1);
+        }
+        setGameStatusText("You peeked at the guest log and Teddy didn't stop you.");
+        setTemporaryReaction("warm", 2400);
+        showDialogue({
+          lines: [
+            "I keep a guest log for people who leave interesting traces behind.",
+            "Tonight, you made the page on purpose.",
+          ],
+        });
+        return;
+      }
+
+      if (!storyFlags.frameSeen) {
+        setStoryFlags((prev) => ({ ...prev, frameSeen: true }));
+        addInventoryItem(SCENE_REWARDS[objectId]!);
+      }
+      addAffection(1);
+      setGameStatusText("The frame reminds Teddy that craft and code never really split apart.");
+      setTemporaryReaction("warm", 2400);
+      showDialogue({
+        lines: [
+          "That frame is the whole thesis statement in one prop.",
+          "Build things carefully, serve people honestly, and let the room remember both.",
+        ],
+      });
+    },
+    [
+      addAffection,
+      addInventoryItem,
+      setTemporaryReaction,
+      showDialogue,
+      storyFlags.bellFound,
+      storyFlags.frameSeen,
+      storyFlags.guestBookRead,
+    ]
+  );
+
+  const handleExternalDrop = useCallback(
+    (itemId: ExternalDragItemId) => {
+      const reward = DROP_REWARDS[itemId];
+      addInventoryItem(reward);
+      addAffection(1);
+      setTemporaryReaction("serving", 2600);
+
+      if (itemId === "beer-glass") {
+        setStoryFlags((prev) => ({ ...prev, beerDelivered: true }));
+        setGameStatusText("You handed Teddy the drink setup directly. He files that under good instincts.");
+        showDialogue({
+          lines: [
+            "Hand delivery? Nice.",
+            "You just unlocked the kind of trust that usually takes three conversations and one bug fix.",
+          ],
+        });
+        return;
+      }
+
+      if (itemId === "coaster") {
+        setStoryFlags((prev) => ({ ...prev, coasterDelivered: true }));
+        setGameStatusText("Teddy flips the coaster, spots the hidden jokes, and lets you keep the best one.");
+        showDialogue({
+          lines: [
+            "You brought the coaster back. Good eye.",
+            "Half the room's tiny jokes hide under things people stop noticing.",
+          ],
+        });
+        return;
+      }
+
+      setStoryFlags((prev) => ({ ...prev, forecastDelivered: true }));
+      setGameStatusText("The forecast note changes the way Teddy talks about the night ahead.");
+      showDialogue({
+        lines: [
+          "Weather changes the room faster than people admit.",
+          "You brought me the proof. Keep the postcard; you'll want it later.",
+        ],
+      });
+    },
+    [addAffection, addInventoryItem, setTemporaryReaction, showDialogue]
+  );
+
+  const handleChoiceSelect = useCallback(
+    (choiceId: string) => {
+      if (choiceContext === "bartender-menu") {
+        if (choiceId === "talk") {
+          runTalkScenario();
+          return;
+        }
+
+        if (choiceId === "order") {
+          setChoiceContext("order-menu");
+          setTemporaryReaction("serving", 1800);
+          showDialogue({
+            lines: [
+              gameOrderCount >= 2
+                ? "The easy menu is getting cut off soon. Pick carefully."
+                : "Pick one. I keep the click-route polite on purpose.",
+            ],
+            choices: ORDER_CHOICES,
+          });
+          return;
+        }
+
+        closeDialogue();
+        return;
+      }
+
+      if (choiceContext === "order-menu") {
+        if (choiceId === "back") {
+          openBartenderMenu();
+          return;
+        }
+
+        if (gameOrderCount >= 2) {
+          setChoiceContext(null);
+          setTemporaryReaction("serious", 2600);
+          setGameStatusText("Teddy cuts off the easy order menu after two drinks and points you toward the terminal.");
+          showDialogue({
+            lines: [
+              "Two drinks is the limit on the safe route.",
+              "If you want more than that, you'll need to type the order yourself in the terminal.",
+            ],
+          });
+          return;
+        }
+
+        const key = choiceId.toLowerCase();
+        const responses = theme.drinks.orderResponses[key];
+        const response = responses?.[Math.min(gameOrderCount, (responses?.length ?? 1) - 1)] ?? `Teddy serves ${choiceId}.`;
+
+        setChoiceContext(null);
+        setGameOrderCount((prev) => prev + 1);
+        addAffection(1);
+        setTemporaryReaction("serving", 2400);
+        setGameStatusText(`Teddy slides over a ${choiceId} from the point-and-click menu.`);
+        showDialogue({
+          lines: [
+            response,
+            "This menu tops out at two drinks. The terminal is where the real chaos lives.",
+          ],
+        });
+      }
+    },
+    [
+      addAffection,
+      choiceContext,
+      closeDialogue,
+      gameOrderCount,
+      openBartenderMenu,
+      runTalkScenario,
+      setTemporaryReaction,
+      showDialogue,
+      theme.drinks.orderResponses,
+    ]
+  );
+
+  const currentReaction = useMemo<BartenderReaction>(() => {
+    if (reactionOverride) return reactionOverride;
+    if (isTerminalOpen) return "serious";
+    if (externalFocus === "menu-board") return "watching-menu";
+    if (externalFocus === "drink-station") return "busy";
+    if (externalFocus === "weather-window") return "curious";
+    if (affection >= 5) return "warm";
+    return "relaxed";
+  }, [affection, externalFocus, isTerminalOpen, reactionOverride]);
+
+  const focusLabel = useMemo(() => {
+    if (isTerminalOpen) return "The terminal snapped Teddy into dev mode.";
+    if (externalFocus) return EXTERNAL_FOCUS_LABELS[externalFocus];
+    if (storyFlags.beerDelivered || storyFlags.coasterDelivered || storyFlags.forecastDelivered) {
+      return "Teddy now expects you to hand him clues from outside the game.";
+    }
+    return null;
+  }, [externalFocus, isTerminalOpen, storyFlags.beerDelivered, storyFlags.coasterDelivered, storyFlags.forecastDelivered]);
+
+  const advanceDialogue = useCallback(() => {
+    if (!dialogue.visible || dialogue.choices.length > 0) return;
+
+    if (dialogue.index < dialogue.lines.length - 1) {
+      clearAmbientTimer();
+      setDialogue((prev) => ({ ...prev, index: prev.index + 1 }));
       return;
     }
 
-    setHiddenSections(new Set());
-
-    sections.forEach((sectionId, index) => {
-      const timeoutId = setTimeout(() => {
-        setHiddenSections((prev) => {
-          const next = new Set(prev);
-          if (BAR_SECTIONS.includes(sectionId as BarSectionId)) {
-            next.add(sectionId as BarSectionId);
-          }
-          return next;
-        });
-
-        if (index === sections.length - 1) {
-          onComplete();
-        }
-      }, index * 400);
-
-      deleteTimersRef.current.push(timeoutId);
-    });
-  }, [clearDeleteTimers]);
+    closeDialogue();
+  }, [clearAmbientTimer, closeDialogue, dialogue]);
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
@@ -144,10 +684,13 @@ function BarLandingContent() {
     return () => {
       stopDrunkEffect();
       clearDeleteTimers();
+      clearAmbientTimer();
+      if (reactionTimerRef.current) {
+        clearTimeout(reactionTimerRef.current);
+      }
     };
-  }, [stopDrunkEffect, clearDeleteTimers]);
+  }, [clearAmbientTimer, clearDeleteTimers, stopDrunkEffect]);
 
-  // Elapsed timer for bar tab
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1);
@@ -155,7 +698,19 @@ function BarLandingContent() {
     return () => clearInterval(interval);
   }, []);
 
-  // Console easter egg
+  useEffect(() => {
+    if (!mounted) return;
+
+    const idleInterval = setInterval(() => {
+      if (dialogue.visible) return;
+
+      const lines = affection >= 4 ? IDLE_LINES.high : IDLE_LINES.low;
+      showDialogue({ lines: [pickRandom(lines)], mode: "ambient" });
+    }, 17000);
+
+    return () => clearInterval(idleInterval);
+  }, [affection, dialogue.visible, mounted, showDialogue]);
+
   useEffect(() => {
     if (!mounted) return;
     const accentColor = theme.type === "bar" ? "#f59e0b" : "#6b4226";
@@ -177,19 +732,9 @@ function BarLandingContent() {
 
   return (
     <div className={`min-h-screen overflow-hidden relative font-sans ${isVIP ? "vip-mode" : ""}`}>
-      {/* Weather-reactive background */}
       <WeatherBackground weather={weather} />
 
-      {/* HTML hidden comment easter egg — rendered as a real comment via dangerouslySetInnerHTML */}
-      <div
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: "<!-- 여기까지 찾아온 당신, 진정한 개발자군요. 커피 한잔 사드릴게요: ☕ -->\n<!-- P.S. 콘솔도 확인해보세요 -->\n<!-- P.P.S. 코나미 코드도 아시죠? ↑↑↓↓←→←→BA -->",
-        }}
-      />
-
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 md:pt-32 pb-20">
-        {/* ═══ Top Section: Neon Sign ═══ */}
+      <main className="relative z-10 max-w-[1500px] mx-auto px-4 sm:px-6 pt-16 sm:pt-24 md:pt-32 pb-20">
         <div style={sectionStyle("neon-sign")}>
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -201,21 +746,27 @@ function BarLandingContent() {
           </motion.div>
         </div>
 
-        {/* ═══ Main Grid: Bar Layout ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-12">
-          {/* ─── Left Column: Menu Board + House Rules ─── */}
-          <div className="lg:col-span-4 space-y-6 sm:space-y-8">
-            {/* Menu Board (Navigation) */}
-            <div style={sectionStyle("menu-board")}>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-10 items-start">
+          <div className="lg:col-span-3 space-y-6 sm:space-y-8">
+            <motion.div
+              style={sectionStyle("menu-board")}
+              onHoverStart={() => setExternalFocus("menu-board")}
+              onHoverEnd={() => setExternalFocus(null)}
+            >
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
               >
                 <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 sm:p-6">
-                  <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <span className="text-xl">📋</span> Menu
-                  </h2>
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span className="text-xl">📋</span> Menu
+                    </h2>
+                    <span className="text-[10px] uppercase tracking-[0.3em] text-gray-500">
+                      Teddy notices hover
+                    </span>
+                  </div>
                   <nav className="space-y-2">
                     <MenuLink href="/todo" emoji="📝" label="Memo" desc="Developer notes" />
                     <MenuLink href="/game" emoji="🕹️" label="Game" desc="Pixel adventure" />
@@ -224,153 +775,171 @@ function BarLandingContent() {
                   </nav>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
 
-            {/* House Rules */}
             <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="flex justify-center"
+              onHoverStart={() => setExternalFocus("house-rules")}
+              onHoverEnd={() => setExternalFocus(null)}
             >
-              <HouseRules />
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="flex justify-center"
+              >
+                <HouseRules />
+              </motion.div>
             </motion.div>
           </div>
 
-          {/* ─── Center Column: Bartender + Beer ─── */}
-          <div className="lg:col-span-4 space-y-6 sm:space-y-8">
-            {/* Bartender introduction */}
-            <div style={sectionStyle("bartender-intro")}>
+          <div className="lg:col-span-6 space-y-6 sm:space-y-8">
+            <div style={sectionStyle("bartender-intro")}> 
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 sm:p-6 text-center"
+                transition={{ duration: 0.7, delay: 0.35 }}
               >
-                <div className="text-4xl mb-3">🧑‍💻</div>
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">
-                  Hi, I&apos;m{" "}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3994ef] to-purple-500">
-                    Teddy
-                  </span>
-                </h2>
-                <p className="text-sm text-gray-400 leading-relaxed mb-4">
-                  Full-Stack Developer by day,
-                  <br />
-                  {theme.type === "bar" ? "bartender of this virtual bar" : "barista of this virtual café"} by night.
-                  <br />
-                  <span className="text-xs text-gray-500">
-                    (a.k.a. Lee KyoungMin / lafamila)
-                  </span>
-                </p>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-sm cursor-default">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
-                  </span>
-                  <span className="text-xs text-gray-400">Open for projects</span>
-                </div>
-
-                {/* Social links */}
-                <div className="mt-4 flex justify-center gap-4 text-gray-500">
-                  <SocialLink
-                    href="https://github.com/lafamila"
-                    icon={<Github className="w-5 h-5" />}
-                    label="Github"
-                  />
-                  <SocialLink
-                    href="https://linkedin.com"
-                    icon={<Linkedin className="w-5 h-5" />}
-                    label="LinkedIn"
-                  />
-                  <SocialLink
-                    href="mailto:hello@example.com"
-                    icon={<Mail className="w-5 h-5" />}
-                    label="Email"
-                  />
-                </div>
+                <TeddyAdventureGame
+                  affection={affection}
+                  affectionLabel={affectionLabel}
+                  reaction={currentReaction}
+                  focusLabel={focusLabel}
+                  isTerminalOpen={isTerminalOpen}
+                  dialogue={dialogue}
+                  onAdvanceDialogue={advanceDialogue}
+                  onChoiceSelect={handleChoiceSelect}
+                  onBartenderClick={openBartenderMenu}
+                  onSceneObjectClick={handleSceneObjectClick}
+                  onExternalDrop={handleExternalDrop}
+                />
               </motion.div>
             </div>
 
-            {/* Beer Glass + Coaster */}
-            <div style={sectionStyle("beer-glass")}>
+            <div style={sectionStyle("beer-glass")}> 
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6, delay: 0.6 }}
-                className="flex flex-col items-center gap-2"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.55 }}
+                className="grid grid-cols-1 md:grid-cols-3 gap-4"
               >
-                {theme.type === "bar" ? <BeerGlass /> : <CoffeeCup />}
-                <Coaster />
+                <ExternalDraggableCard
+                  title="Beer Glass"
+                  subtitle="Drag to Teddy"
+                  dragId="beer-glass"
+                  onActivate={() => setExternalFocus("drink-station")}
+                  onDeactivate={() => setExternalFocus(null)}
+                  onDragStart={() => {
+                    setTemporaryReaction("curious", 1800);
+                    setGameStatusText("You picked up the beer glass setup to deliver it to Teddy.");
+                  }}
+                >
+                  <BeerGlass />
+                </ExternalDraggableCard>
+
+                <ExternalDraggableCard
+                  title="Coaster"
+                  subtitle="Drag to Teddy"
+                  dragId="coaster"
+                  onActivate={() => setExternalFocus("drink-station")}
+                  onDeactivate={() => setExternalFocus(null)}
+                  onDragStart={() => {
+                    setTemporaryReaction("curious", 1800);
+                    setGameStatusText("You lifted the coaster to see what Teddy does with it.");
+                  }}
+                >
+                  <Coaster />
+                </ExternalDraggableCard>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.8 }}
+                  className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 flex flex-col justify-between"
+                >
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.35em] text-[#7dd3fc] mb-3">
+                      Outside Links
+                    </p>
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      The real Teddy still answers outside the game.
+                    </h3>
+                    <p className="text-sm text-gray-400 leading-relaxed">
+                      The bar is playful, but the work is real. If you want the serious route, the links are still here.
+                    </p>
+                  </div>
+
+                  <div className="mt-5 flex items-center gap-4 text-gray-500">
+                    <SocialLink href="https://github.com/lafamila" icon={<GithubIcon className="w-5 h-5" />} label="Github" />
+                    <SocialLink href="https://linkedin.com" icon={<LinkedinIcon className="w-5 h-5" />} label="LinkedIn" />
+                    <SocialLink href="mailto:hello@example.com" icon={<Mail className="w-5 h-5" />} label="Email" />
+                  </div>
+                </motion.div>
               </motion.div>
             </div>
           </div>
 
-          {/* ─── Right Column: Bar Tab + Weather ─── */}
-          <div className="lg:col-span-4 space-y-6 sm:space-y-8">
-            {/* Bar Tab + Weather Bartender */}
-            <div style={sectionStyle("bar-tab")}>
+          <div className="lg:col-span-3 space-y-6 sm:space-y-8">
+            <div style={sectionStyle("bar-tab")}> 
               <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.5 }}
               >
-                <BarTab weather={weather} />
+                <BarTab
+                  weather={weather}
+                  affection={affection}
+                  affectionLabel={affectionLabel}
+                  gameStatusText={gameStatusText}
+                />
               </motion.div>
             </div>
 
-            {/* Weather Window */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-            >
-              <WeatherWindow weather={weather} />
+            <motion.div onHoverStart={() => setExternalFocus("weather-window")} onHoverEnd={() => setExternalFocus(null)}>
+              <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="relative"
+              >
+                <button
+                  type="button"
+                  draggable
+                  onDragStart={(event: DragEvent<HTMLButtonElement>) => {
+                    event.dataTransfer.setData("text/plain", "weather-note");
+                    event.dataTransfer.effectAllowed = "copy";
+                    setTemporaryReaction("curious", 1800);
+                    setGameStatusText("You tore off a little forecast note to hand Teddy the mood of the night.");
+                  }}
+                  className="absolute right-3 top-3 z-10 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-[#7dd3fc] cursor-grab active:cursor-grabbing"
+                >
+                  Drag Note
+                </button>
+                <WeatherWindow weather={weather} />
+              </motion.div>
             </motion.div>
-            {/* Tech Grid Cards */}
-            <div style={sectionStyle("grid-cards")}>
+
+            <div style={sectionStyle("grid-cards")}> 
               <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.7 }}
-                className="grid grid-cols-2 gap-3"
               >
-                <GridCard
-                  title="7+ Years"
-                  desc="Writing code & fixing bugs"
-                  emoji="⚡"
-                  delay={0.8}
-                />
-                <GridCard
-                  title="Full Stack"
-                  desc="Frontend to infrastructure"
-                  emoji="🔧"
-                  delay={0.9}
-                />
-                <GridCard
-                  title="Open Source"
-                  desc="Contributing & learning"
-                  emoji="🌐"
-                  delay={1.0}
-                />
-                <GridCard
-                  title="Seoul, KR"
-                  desc="Based in South Korea"
-                  emoji="📍"
-                  delay={1.1}
-                />
+                <TeddyInventory items={inventory} />
               </motion.div>
             </div>
           </div>
         </div>
       </main>
 
-      {/* ═══ Terminal Toggle (Fixed Bottom Right) ═══ */}
       <motion.button
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.2 }}
-        onClick={() => setIsTerminalOpen(true)}
+        onClick={() => {
+          setIsTerminalOpen(true);
+          setTemporaryReaction("serious", 2600);
+          setGameStatusText("The terminal opens and Teddy's expression sharpens immediately.");
+        }}
         className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 p-3 sm:p-4 bg-[#3994ef] text-white rounded-full shadow-lg hover:bg-blue-600 transition-colors z-40 group"
         style={{
           boxShadow: "0 0 20px rgba(57, 148, 239, 0.3)",
@@ -379,22 +948,21 @@ function BarLandingContent() {
         <TerminalIcon className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
       </motion.button>
 
-      {/* Terminal Overlay */}
       <BarTerminalOverlay
         isOpen={isTerminalOpen}
-        onClose={() => setIsTerminalOpen(false)}
+        onClose={() => {
+          setIsTerminalOpen(false);
+          setGameStatusText("The terminal closes and Teddy relaxes back into bartender mode.");
+        }}
         elapsedSeconds={elapsed}
         onDrunkEffect={handleDrunkEffect}
         onDeleteEffect={handleDeleteEffect}
       />
 
-      {/* VIP Menu (Konami Code) */}
       <VIPMenu isVIP={isVIP} onClose={resetVIP} />
     </div>
   );
 }
-
-// ─── Sub-components ───
 
 function MenuLink({
   href,
@@ -413,9 +981,7 @@ function MenuLink({
       className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group"
       whileHover={{ x: 4 }}
     >
-      <span className="text-lg group-hover:scale-110 transition-transform">
-        {emoji}
-      </span>
+      <span className="text-lg group-hover:scale-110 transition-transform">{emoji}</span>
       <div>
         <span className="text-sm font-semibold text-white group-hover:text-[#3994ef] transition-colors">
           {label}
@@ -432,7 +998,7 @@ function SocialLink({
   label,
 }: {
   href: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
 }) {
   return (
@@ -449,28 +1015,50 @@ function SocialLink({
   );
 }
 
-function GridCard({
+function ExternalDraggableCard({
   title,
-  desc,
-  emoji,
-  delay,
+  subtitle,
+  dragId,
+  children,
+  onActivate,
+  onDeactivate,
+  onDragStart,
 }: {
   title: string;
-  desc: string;
-  emoji: string;
-  delay: number;
+  subtitle: string;
+  dragId: ExternalDragItemId;
+  children: ReactNode;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onDragStart: () => void;
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay }}
-      whileHover={{ y: -3, borderColor: "rgba(255,255,255,0.2)" }}
-      className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm cursor-default hover:bg-white/10 transition-colors"
+      className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-4 sm:p-5"
+      onHoverStart={onActivate}
+      onHoverEnd={onDeactivate}
     >
-      <span className="text-xl block mb-2">{emoji}</span>
-      <h3 className="text-sm font-bold mb-1">{title}</h3>
-      <p className="text-gray-400 text-xs leading-relaxed">{desc}</p>
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-white">{title}</h3>
+            <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+          </div>
+          <button
+            type="button"
+            draggable
+            onDragStart={(event: DragEvent<HTMLButtonElement>) => {
+              event.dataTransfer.setData("text/plain", dragId);
+              event.dataTransfer.effectAllowed = "copy";
+              onDragStart();
+            }}
+            className="rounded-full border border-white/10 bg-black/50 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-[#7dd3fc] cursor-grab active:cursor-grabbing"
+          >
+            deliver
+          </button>
+        </div>
+        <div className="flex items-center justify-center min-h-[180px]">{children}</div>
+      </div>
     </motion.div>
   );
 }

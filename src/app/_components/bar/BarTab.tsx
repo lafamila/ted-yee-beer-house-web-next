@@ -7,6 +7,9 @@ import { useTheme } from "./theme";
 
 interface BarTabProps {
   weather: WeatherData;
+  affection: number;
+  affectionLabel: string;
+  gameStatusText: string;
 }
 
 function formatTime(seconds: number): string {
@@ -16,7 +19,12 @@ function formatTime(seconds: number): string {
   return `${m}m ${s}s`;
 }
 
-export default function BarTab({ weather }: BarTabProps) {
+export default function BarTab({
+  weather,
+  affection,
+  affectionLabel,
+  gameStatusText,
+}: BarTabProps) {
   const theme = useTheme();
   const [elapsed, setElapsed] = useState(0);
 
@@ -58,6 +66,22 @@ export default function BarTab({ weather }: BarTabProps) {
             )}
           </div>
         </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.65 }}
+        className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4"
+      >
+        <div className="flex items-center justify-between gap-3 text-xs font-mono text-gray-400">
+          <span>Affinity status</span>
+          <span className="text-white">{affection}/7</span>
+        </div>
+        <p className="text-sm text-white mt-2">{affectionLabel}</p>
+        <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+          {gameStatusText}
+        </p>
       </motion.div>
 
       {/* Bar tab */}

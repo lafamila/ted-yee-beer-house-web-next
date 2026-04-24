@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,6 +24,8 @@ export default function LoginPage() {
 
     try {
       await login(username, password);
+      const redirectTo = searchParams.get('redirect') || '/todo';
+      router.push(redirectTo);
     } catch (err) {
       const message = err instanceof Error ? err.message : '로그인에 실패했습니다.';
       setError(message);

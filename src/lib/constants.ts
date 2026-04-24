@@ -1,7 +1,24 @@
 import type { SortOption } from "./types";
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3031/api/todo";
+function resolveApiRoot(apiUrl: string | undefined): string {
+  const fallback = "http://localhost:3031/api";
+
+  if (!apiUrl) {
+    return fallback;
+  }
+
+  const normalizedUrl = apiUrl.replace(/\/+$/, "");
+
+  if (normalizedUrl.endsWith("/todo") || normalizedUrl.endsWith("/travel")) {
+    return normalizedUrl.replace(/\/(todo|travel)$/, "");
+  }
+
+  return normalizedUrl;
+}
+
+export const API_ROOT_URL = resolveApiRoot(process.env.NEXT_PUBLIC_API_URL);
+export const TODO_API_BASE_URL = `${API_ROOT_URL}/todo`;
+export const TRAVEL_API_BASE_URL = `${API_ROOT_URL}/travel`;
 
 export const LIVEKIT_URL =
   process.env.NEXT_PUBLIC_LIVEKIT_URL || 'ws://localhost:7880';
