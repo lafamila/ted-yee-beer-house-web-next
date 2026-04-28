@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl, {
   Marker,
   NavigationControl,
@@ -27,42 +27,19 @@ interface TravelMapBoardProps {
   selectedPlaceId: string | null;
   selectedPlaceIds: string[];
   draftPosition: FloatingPanelAnchor | null;
-  floatingPanel?: ReactNode;
-  floatingPanelAnchor?: FloatingPanelAnchor | null;
   onMarkerClick: (placeId: string) => void;
   onMarkerLongPress: (placeId: string) => void;
   onMapPick: (coords: FloatingPanelAnchor) => void;
-  onDismissPanel: () => void;
   onBoundsChange?: (bounds: MapBounds) => void;
   onRefresh?: () => void;
 }
 
 const OPEN_FREE_MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
-function categoryLabel(category: string) {
-  switch (category) {
-    case 'food':
-      return 'FOOD';
-    case 'coffee':
-      return 'CAFE';
-    case 'bar':
-      return 'BAR';
-    case 'culture':
-      return 'ART';
-    case 'nature':
-      return 'PARK';
-    case 'shopping':
-      return 'SHOP';
-    case 'stay':
-      return 'STAY';
-    default:
-      return 'SPOT';
-  }
-}
-
 function buildMarkerContent(options: {
   name: string;
   category: string;
+  imageUrl?: string | null;
   active: boolean;
   multi: boolean;
   draft?: boolean;
@@ -82,21 +59,19 @@ function buildMarkerContent(options: {
     .join(' ');
   card.className = classes;
 
+  const image = document.createElement('span');
+  image.className = 'travel-marker__image';
+  if (options.imageUrl) {
+    image.style.backgroundImage = `url(${options.imageUrl})`;
+  }
+
   const label = document.createElement('span');
   label.className = 'travel-marker__label';
   label.textContent = options.name;
 
-  const meta = document.createElement('span');
-  meta.className = 'travel-marker__meta';
-  meta.textContent = options.draft ? 'PINNED' : categoryLabel(options.category);
-
-  card.append(label, meta);
+  card.append(image, label);
   root.append(card);
   return root;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 export function TravelMapBoard({
@@ -105,12 +80,9 @@ export function TravelMapBoard({
   selectedPlaceId,
   selectedPlaceIds,
   draftPosition,
-  floatingPanel,
-  floatingPanelAnchor,
   onMarkerClick,
   onMarkerLongPress,
   onMapPick,
-  onDismissPanel,
   onBoundsChange,
   onRefresh,
 }: TravelMapBoardProps) {
@@ -124,9 +96,6 @@ export function TravelMapBoard({
   const onMarkerLongPressRef = useRef(onMarkerLongPress);
   const onBoundsChangeRef = useRef(onBoundsChange);
   const [mapReady, setMapReady] = useState(false);
-  const [panelPosition, setPanelPosition] = useState<{ left: number; top: number } | null>(
-    null,
-  );
 
   useEffect(() => {
     onMapPickRef.current = onMapPick;
@@ -219,6 +188,7 @@ export function TravelMapBoard({
       const element = buildMarkerContent({
         name: place.name,
         category: place.category,
+        imageUrl: place.coverImageUrl || place.photoUrls[0] || null,
         active: selectedPlaceId === place.id,
         multi: selectedPlaceIds.includes(place.id),
       });
@@ -317,77 +287,20 @@ export function TravelMapBoard({
       .addTo(map);
   }, [draftPosition, mapReady]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    const container = containerRef.current;
-    if (!map || !container || !floatingPanelAnchor) {
-      return;
-    }
-
-    const updatePosition = () => {
-      const point = map.project([
-        floatingPanelAnchor.longitude,
-        floatingPanelAnchor.latitude,
-      ]);
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      setPanelPosition({
-        left: clamp(point.x + 22, 16, Math.max(16, width - 420)),
-        top: clamp(point.y - 42, 16, Math.max(16, height - 520)),
-      });
-    };
-
-    updatePosition();
-    map.on('move', updatePosition);
-    map.on('zoom', updatePosition);
-    map.on('resize', updatePosition);
-
-    return () => {
-      map.off('move', updatePosition);
-      map.off('zoom', updatePosition);
-      map.off('resize', updatePosition);
-    };
-  }, [floatingPanelAnchor]);
-
   return (
-    <div className="relative h-full w-full overflow-visible rounded-[2rem]">
-      <div className="absolute inset-0 overflow-hidden rounded-[2rem] border border-white/10 bg-[#08111f] shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+    <div className="relative h-full w-full overflow-visible rounded-[1.25rem]">
+      <div className="absolute inset-0 overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#08111f] shadow-[0_26px_64px_rgba(0,0,0,0.34)]">
         <div ref={containerRef} className="travel-map h-full w-full" />
         {onRefresh && (
           <button
             type="button"
             onClick={onRefresh}
-            className="absolute right-3 top-3 z-10 rounded-xl border border-white/15 bg-slate-950/80 px-3 py-2 text-xs font-medium text-white/70 backdrop-blur transition-all hover:border-white/30 hover:text-white"
+            className="absolute right-2.5 top-2.5 z-10 rounded-lg border border-white/15 bg-slate-950/80 px-2.5 py-1.5 text-xs font-medium text-white/70 backdrop-blur transition-all hover:border-white/30 hover:text-white"
           >
             ↻ 이 지역 검색
           </button>
         )}
       </div>
-
-      {floatingPanel && panelPosition ? (
-        <div
-          className="absolute z-40 w-[420px] max-w-[calc(100%-24px)]"
-          style={{
-            left: panelPosition.left,
-            top: panelPosition.top,
-          }}
-        >
-          <div className="max-h-[min(72vh,760px)] overflow-hidden rounded-[1.75rem] border border-white/12 bg-slate-950/96 shadow-[0_35px_70px_rgba(0,0,0,0.45)] backdrop-blur">
-            <div className="sticky top-0 z-20 flex items-center justify-end border-b border-white/10 bg-slate-950/96 px-5 py-4">
-              <button
-                type="button"
-                onClick={onDismissPanel}
-                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/65 hover:border-white/25 hover:text-white"
-              >
-                닫기
-              </button>
-            </div>
-            <div className="max-h-[calc(min(72vh,760px)-72px)] overflow-y-auto px-5 pb-5">
-              {floatingPanel}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

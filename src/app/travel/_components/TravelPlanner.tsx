@@ -1,9 +1,19 @@
 'use client';
 
-import type { ChangeEvent } from 'react';
+import type {
+  ChangeEvent,
+  ClipboardEvent,
+  Dispatch,
+  SetStateAction,
+} from 'react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MapBounds } from './TravelMapBoard';
+import {
+  ChevronRight,
+  MousePointer2,
+  Search,
+} from 'lucide-react';
 import {
   createTravelPlace,
   createTravelReview,
@@ -35,7 +45,7 @@ const TravelMapBoard = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full min-h-[70vh] items-center justify-center rounded-[2rem] border border-white/10 bg-[#08111f] text-sm text-white/55">
+      <div className="flex h-full min-h-[70vh] items-center justify-center rounded-[1.25rem] border border-white/10 bg-[#08111f] text-sm text-white/55">
         실제 지도를 불러오는 중...
       </div>
     ),
@@ -76,6 +86,25 @@ function mapPrimaryTypeToCategory(primaryType: string | null | undefined): Trave
   return PRIMARY_TYPE_TO_CATEGORY[normalized] ?? 'other';
 }
 
+function getPlaceImage(place: TravelPlaceInterface) {
+  return place.coverImageUrl || place.photoUrls[0] || null;
+}
+
+function getClipboardImageFiles(event: ClipboardEvent<HTMLElement>) {
+  const filesFromItems = Array.from(event.clipboardData.items)
+    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+
+  if (filesFromItems.length) {
+    return filesFromItems;
+  }
+
+  return Array.from(event.clipboardData.files).filter((file) =>
+    file.type.startsWith('image/'),
+  );
+}
+
 const DEFAULT_CENTER = {
   latitude: 37.5665,
   longitude: 126.978,
@@ -110,6 +139,7 @@ export function TravelPlanner() {
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>(null);
   const [topPanelMode, setTopPanelMode] = useState<TopPanelMode>(null);
+  const [placesOpen, setPlacesOpen] = useState(true);
   const [draftPosition, setDraftPosition] = useState<{
     latitude: number;
     longitude: number;
@@ -139,13 +169,6 @@ export function TravelPlanner() {
 
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? null;
   const selectedCourse = courses.find((course) => course.id === selectedCourseId) ?? null;
-
-  const editorAnchor = selectedPlace
-    ? {
-        latitude: selectedPlace.latitude,
-        longitude: selectedPlace.longitude,
-      }
-    : draftPosition;
 
   const syncPlaceForm = (
     place: TravelPlaceInterface | null,
@@ -184,17 +207,11 @@ export function TravelPlanner() {
 
     try {
       const bbox = boundsRef.current ?? undefined;
-      const [placeList, courseList] = await Promise.all([
-        getTravelPlaces(bbox),
-        getTravelCourses(),
-      ]);
+      const placeList = await getTravelPlaces(bbox);
 
       setPlaces(placeList);
-      setCourses(courseList);
 
       const nextPlaceId = preferredPlaceId ?? selectedPlaceId ?? null;
-      const nextCourseId = preferredCourseId ?? selectedCourseId ?? courseList[0]?.id ?? null;
-
       if (nextPlaceId) {
         const detail = await getTravelPlace(nextPlaceId);
         setPlaces((prev) =>
@@ -205,14 +222,6 @@ export function TravelPlanner() {
           syncPlaceForm(detail);
         }
       }
-
-      if (nextCourseId) {
-        const detail = await getTravelCourse(nextCourseId);
-        setCourses((prev) =>
-          prev.map((course) => (course.id === detail.id ? detail : course)),
-        );
-        setSelectedCourseId(detail.id);
-      }
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -221,6 +230,26 @@ export function TravelPlanner() {
       );
     } finally {
       setIsLoading(false);
+    }
+
+    try {
+      const courseList = await getTravelCourses();
+      setCourses(courseList);
+
+      const nextCourseId = preferredCourseId ?? selectedCourseId ?? courseList[0]?.id ?? null;
+      if (!nextCourseId) {
+        setSelectedCourseId(null);
+        return;
+      }
+
+      const detail = await getTravelCourse(nextCourseId);
+      setCourses((prev) =>
+        prev.map((course) => (course.id === detail.id ? detail : course)),
+      );
+      setSelectedCourseId(detail.id);
+    } catch {
+      setCourses([]);
+      setSelectedCourseId(null);
     }
   };
 
@@ -406,6 +435,20 @@ export function TravelPlanner() {
     }
     const uploaded = await uploadTravelFiles(files, folder);
     return uploaded.map((file) => file.url);
+  };
+
+  const appendClipboardImages = (
+    event: ClipboardEvent<HTMLElement>,
+    setFiles: Dispatch<SetStateAction<File[]>>,
+  ) => {
+    const imageFiles = getClipboardImageFiles(event);
+    if (!imageFiles.length) {
+      return;
+    }
+
+    event.preventDefault();
+    setFiles((prev) => [...prev, ...imageFiles]);
+    setError(null);
   };
 
   const handlePlaceSubmit = async () => {
@@ -625,8 +668,8 @@ export function TravelPlanner() {
   };
 
   const placeEditorPanel = (
-    <div className="space-y-4 pt-4">
-      <div className="sticky top-0 z-10 -mx-5 border-b border-white/10 bg-slate-950/96 px-5 pb-4">
+    <div className="space-y-3 pt-3">
+      <div className="sticky top-0 z-10 -mx-4 border-b border-white/10 bg-slate-950/96 px-4 pb-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-white">
             {editorMode === 'edit' ? '장소 수정' : '새 장소 등록'}
@@ -638,11 +681,11 @@ export function TravelPlanner() {
           ) : null}
         </div>
 
-        <div className="mt-3 grid gap-3">
+        <div className="mt-3 grid gap-2.5">
           <label className="text-sm text-white/60">
             장소명
             <input
-              className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
               value={placeForm.name}
               onChange={(event) => setPlaceForm((prev) => ({ ...prev, name: event.target.value }))}
             />
@@ -651,7 +694,7 @@ export function TravelPlanner() {
           <label className="text-sm text-white/60">
             카테고리
             <select
-              className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
               value={placeForm.category}
               onChange={(event) =>
                 setPlaceForm((prev) => ({
@@ -670,12 +713,12 @@ export function TravelPlanner() {
         </div>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2.5">
 
         <label className="text-sm text-white/60">
           주소
           <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+            className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
             value={placeForm.address}
             onChange={(event) => setPlaceForm((prev) => ({ ...prev, address: event.target.value }))}
           />
@@ -684,7 +727,7 @@ export function TravelPlanner() {
         <label className="text-sm text-white/60">
           운영시간
           <textarea
-            className="mt-1 min-h-[70px] w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+            className="mt-1 min-h-[64px] w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
             value={placeForm.openingHours}
             onChange={(event) => setPlaceForm((prev) => ({ ...prev, openingHours: event.target.value }))}
           />
@@ -693,7 +736,7 @@ export function TravelPlanner() {
         <label className="text-sm text-white/60">
           설명
           <textarea
-            className="mt-1 min-h-[80px] w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+            className="mt-1 min-h-[72px] w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
             value={placeForm.description}
             onChange={(event) => setPlaceForm((prev) => ({ ...prev, description: event.target.value }))}
           />
@@ -702,7 +745,7 @@ export function TravelPlanner() {
         <label className="text-sm text-white/60">
           특이사항
           <textarea
-            className="mt-1 min-h-[80px] w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+            className="mt-1 min-h-[72px] w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
             value={placeForm.specialNotes}
             onChange={(event) => setPlaceForm((prev) => ({ ...prev, specialNotes: event.target.value }))}
           />
@@ -711,20 +754,27 @@ export function TravelPlanner() {
         <label className="text-sm text-white/60">
           태그
           <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+            className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
             placeholder="예: brunch, night-view"
             value={placeForm.tags}
             onChange={(event) => setPlaceForm((prev) => ({ ...prev, tags: event.target.value }))}
           />
         </label>
 
-        <label className="text-sm text-white/60">
+        <label
+          className="rounded-xl border border-dashed border-white/10 bg-white/[0.03] p-3 text-sm text-white/60 outline-none transition focus:border-sky-300/45 focus:bg-sky-300/5"
+          tabIndex={0}
+          onPaste={(event) => appendClipboardImages(event, setNewPlaceFiles)}
+        >
           장소 사진 업로드
+          <span className="ml-2 text-xs text-white/40">
+            파일 선택 또는 이미지 붙여넣기
+          </span>
           <input
             type="file"
             multiple
             accept="image/*"
-            className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-950"
+            className="mt-2 block w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-950"
             onChange={(event) =>
               setNewPlaceFiles(Array.from(event.target.files ?? []))
             }
@@ -734,12 +784,11 @@ export function TravelPlanner() {
 
       {(placePhotoUrls.length || newPlaceFiles.length) ? (
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.24em] text-white/40">photos</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2.5">
             {placePhotoUrls.map((url) => (
               <div key={url} className="space-y-2">
                 <div
-                  className="aspect-square rounded-2xl border border-white/10 bg-cover bg-center"
+                  className="aspect-square rounded-xl border border-white/10 bg-cover bg-center"
                   style={{ backgroundImage: `url(${url})` }}
                 />
                 <button
@@ -756,7 +805,7 @@ export function TravelPlanner() {
             {newPlaceFiles.map((file) => (
               <div
                 key={`${file.name}-${file.size}`}
-                className="flex aspect-square items-end rounded-2xl border border-dashed border-sky-300/30 bg-sky-400/5 p-3 text-xs text-sky-100"
+                className="flex aspect-square items-end rounded-xl border border-dashed border-sky-300/30 bg-sky-400/5 p-2.5 text-xs text-sky-100"
               >
                 {file.name}
               </div>
@@ -772,20 +821,20 @@ export function TravelPlanner() {
       </div>
 
       {editorMode === 'edit' && selectedPlace ? (
-        <div className="space-y-3 border-t border-white/10 pt-4">
+        <div className="space-y-3 border-t border-white/10 pt-3">
           <div className="space-y-1">
             <h3 className="font-medium text-white">후기 추가</h3>
           </div>
 
           <div className="grid gap-3">
-            <div className="grid gap-3 sm:grid-cols-[96px_1fr]">
+            <div className="grid gap-2.5 sm:grid-cols-[96px_1fr]">
               <label className="text-sm text-white/60">
                 별점
                 <input
                   type="number"
                   min="1"
                   max="5"
-                  className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
                   value={reviewForm.rating}
                   onChange={(event) => setReviewForm((prev) => ({ ...prev, rating: event.target.value }))}
                 />
@@ -793,7 +842,7 @@ export function TravelPlanner() {
               <label className="text-sm text-white/60">
                 한줄 요약
                 <input
-                  className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
                   value={reviewForm.headline}
                   onChange={(event) => setReviewForm((prev) => ({ ...prev, headline: event.target.value }))}
                 />
@@ -804,7 +853,7 @@ export function TravelPlanner() {
               방문일
               <input
                 type="date"
-                className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+                className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
                 value={reviewForm.visitedAt}
                 onChange={(event) => setReviewForm((prev) => ({ ...prev, visitedAt: event.target.value }))}
               />
@@ -813,19 +862,26 @@ export function TravelPlanner() {
             <label className="text-sm text-white/60">
               후기 내용
               <textarea
-                className="mt-1 min-h-[90px] w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+                className="mt-1 min-h-[78px] w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
                 value={reviewForm.body}
                 onChange={(event) => setReviewForm((prev) => ({ ...prev, body: event.target.value }))}
               />
             </label>
 
-            <label className="text-sm text-white/60">
+            <label
+              className="rounded-xl border border-dashed border-white/10 bg-white/[0.03] p-3 text-sm text-white/60 outline-none transition focus:border-sky-300/45 focus:bg-sky-300/5"
+              tabIndex={0}
+              onPaste={(event) => appendClipboardImages(event, setReviewFiles)}
+            >
               후기 사진 업로드
+              <span className="ml-2 text-xs text-white/40">
+                파일 선택 또는 이미지 붙여넣기
+              </span>
               <input
                 type="file"
                 multiple
                 accept="image/*"
-                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-950"
+                className="mt-2 block w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-950"
                 onChange={(event) =>
                   setReviewFiles(Array.from(event.target.files ?? []))
                 }
@@ -836,7 +892,7 @@ export function TravelPlanner() {
           {selectedPlace.reviews.length ? (
             <div className="space-y-2">
               {selectedPlace.reviews.slice(0, 2).map((review) => (
-                <div key={review.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/70">
+                <div key={review.id} className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70">
                   <div className="flex items-center justify-between">
                     <span>{review.headline || '제목 없는 후기'}</span>
                     <span>{'★'.repeat(review.rating)}</span>
@@ -856,35 +912,35 @@ export function TravelPlanner() {
   );
 
   const exportPanel = (
-    <div className="mt-4 grid gap-3 rounded-3xl border border-white/10 bg-slate-950/85 p-4 backdrop-blur">
-      <div className="grid gap-3 md:grid-cols-2">
+    <div className="mt-3 grid gap-2.5 rounded-2xl border border-white/10 bg-slate-950/85 p-3 backdrop-blur">
+      <div className="grid gap-2.5 md:grid-cols-2">
         <input
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
           placeholder="코스 시작 위치"
           value={tripStartLocation}
           onChange={(event) => setTripStartLocation(event.target.value)}
         />
         <input
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
           placeholder="테마"
           value={tripTheme}
           onChange={(event) => setTripTheme(event.target.value)}
         />
         <input
           type="datetime-local"
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
           value={tripStartAt}
           onChange={(event) => setTripStartAt(event.target.value)}
         />
         <input
           type="datetime-local"
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
           value={tripEndAt}
           onChange={(event) => setTripEndAt(event.target.value)}
         />
       </div>
       <input
-        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-white outline-none"
         placeholder="여행 페이스"
         value={tripPace}
         onChange={(event) => setTripPace(event.target.value)}
@@ -899,7 +955,7 @@ export function TravelPlanner() {
       </div>
       {exportResult ? (
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-          <pre className="max-h-[220px] overflow-auto rounded-2xl bg-black/40 p-4 text-xs text-emerald-100">
+          <pre className="max-h-[220px] overflow-auto rounded-xl bg-black/40 p-3 text-xs text-emerald-100">
             {JSON.stringify(exportResult.payload, null, 2)}
           </pre>
           <div className="flex flex-col gap-2">
@@ -936,9 +992,9 @@ export function TravelPlanner() {
   );
 
   const importPanel = (
-    <div className="mt-4 grid gap-3 rounded-3xl border border-white/10 bg-slate-950/85 p-4 backdrop-blur">
+    <div className="mt-3 grid gap-2.5 rounded-2xl border border-white/10 bg-slate-950/85 p-3 backdrop-blur">
       <textarea
-        className="min-h-[180px] rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+        className="min-h-[160px] rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none"
         placeholder="코스 JSON을 붙여넣으세요."
         value={importText}
         onChange={(event) => setImportText(event.target.value)}
@@ -955,21 +1011,130 @@ export function TravelPlanner() {
     </div>
   );
 
+  const placeGallery = (
+    <aside className="order-3 flex min-h-0 flex-col overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#f4f0e8] text-[#2d261e] shadow-[0_24px_54px_rgba(0,0,0,0.25)] lg:order-none">
+      <div className="border-b border-[#2d261e]/10 px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-semibold leading-tight">Places</h2>
+          <button
+            type="button"
+            onClick={() => setPlacesOpen(false)}
+            className="hidden rounded-full border border-[#2d261e]/10 px-3 py-1 text-sm text-[#6e6258] hover:border-[#2d261e]/25 lg:inline-flex"
+          >
+            접기
+          </button>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {places.length ? (
+          <div className="grid gap-2.5">
+            {places.map((place) => {
+              const image = getPlaceImage(place);
+              const selected = selectedPlaceId === place.id || selectedPlaceIds.includes(place.id);
+              return (
+                <button
+                  key={place.id}
+                  type="button"
+                  onClick={() => handleMarkerClick(place.id)}
+                  className={`group overflow-hidden rounded-[1.05rem] border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl ${
+                    selected ? 'border-[#2d261e]' : 'border-black/5'
+                  }`}
+                >
+                  <div className="relative aspect-[16/10] overflow-hidden bg-[#d9d2c7]">
+                    {image ? (
+                      <div
+                        className="h-full w-full bg-cover bg-center transition duration-500 group-hover:scale-105"
+                        style={{ backgroundImage: `url(${image})` }}
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-[linear-gradient(135deg,#d5c1a2,#7aa4a9)]" />
+                    )}
+                    {selected ? (
+                      <div className="absolute right-3 top-3 h-3 w-3 rounded-full bg-[#2d261e] ring-2 ring-white" />
+                    ) : null}
+                  </div>
+                  <div className="space-y-1.5 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="line-clamp-2 text-lg font-semibold leading-tight">
+                        {place.name}
+                      </h3>
+                    </div>
+                    <p className="line-clamp-2 text-sm leading-5 text-[#6e6258]">
+                      {place.address || place.description || place.specialNotes || ''}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {place.tags.slice(0, 3).map((tag) => (
+                        <span key={tag} className="rounded-full bg-[#f0ede6] px-2.5 py-0.5 text-xs text-[#6e6258]">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-[1.05rem] border border-dashed border-[#2d261e]/20 bg-white/50 p-4 text-sm leading-6 text-[#6e6258]">
+            저장된 장소가 없습니다.
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+
+  const collapsedPlaces = (
+    <aside className="order-3 hidden min-h-[52px] items-center justify-center rounded-[1.1rem] border border-white/10 bg-[#f4f0e8] text-[#2d261e] shadow-[0_20px_42px_rgba(0,0,0,0.24)] lg:order-none lg:flex lg:min-h-0">
+      <button
+        type="button"
+        onClick={() => setPlacesOpen(true)}
+        aria-label="Places 펼치기"
+        className="flex h-full min-h-[52px] w-full items-center justify-center rounded-[1.1rem] text-[#6e6258] transition hover:bg-white/45 hover:text-[#2d261e]"
+      >
+        <ChevronRight size={20} strokeWidth={2.4} aria-hidden="true" />
+      </button>
+    </aside>
+  );
+
   const footerCourses = (
-    <div className="border-t border-white/10 bg-slate-950/92 px-4 py-4 backdrop-blur md:px-6">
-        <div className="flex items-center justify-between gap-4">
-          <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">
-            {courses.length} courses
-          </span>
+    <div className="order-4 border-t border-white/10 bg-[#070d15]/94 px-3 py-3 backdrop-blur md:px-4">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Button
+            variant={multiSelectMode ? 'primary' : 'secondary'}
+            onClick={() => {
+              if (multiSelectMode) {
+                setMultiSelectMode(false);
+                setSelectedPlaceIds([]);
+                setExportResult(null);
+              } else {
+                setMultiSelectMode(true);
+              }
+            }}
+          >
+            {multiSelectMode ? '선택 해제' : '코스 선택'}
+          </Button>
+          <Button
+            variant={topPanelMode === 'export' ? 'primary' : 'ghost'}
+            onClick={() => setTopPanelMode((prev) => (prev === 'export' ? null : 'export'))}
+          >
+            Export
+          </Button>
+          <Button
+            variant={topPanelMode === 'import' ? 'primary' : 'ghost'}
+            onClick={() => setTopPanelMode((prev) => (prev === 'import' ? null : 'import'))}
+          >
+            Import
+          </Button>
         </div>
 
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+        <div className="flex gap-2.5 overflow-x-auto pb-1">
           {courses.map((course) => (
             <button
               key={course.id}
               type="button"
               onClick={() => setSelectedCourseId(course.id)}
-              className={`min-w-[280px] rounded-3xl border px-4 py-4 text-left transition ${
+              className={`min-w-[260px] rounded-2xl border px-3 py-3 text-left transition ${
                 selectedCourseId === course.id
                   ? 'border-sky-300/45 bg-sky-400/10'
                   : 'border-white/10 bg-white/5 hover:border-white/25'
@@ -987,8 +1152,8 @@ export function TravelPlanner() {
         </div>
 
         {selectedCourse ? (
-          <div className="mt-4 rounded-3xl border border-white/10 bg-black/25 p-4 text-sm text-white/70">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-3 text-sm text-white/70">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-semibold text-white">{selectedCourse.title}</h3>
                 <p className="mt-1 text-white/50">
@@ -1001,9 +1166,9 @@ export function TravelPlanner() {
               </Button>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
               {selectedCourse.stops.map((stop) => (
-                <div key={`${selectedCourse.id}-${stop.order}`} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div key={`${selectedCourse.id}-${stop.order}`} className="rounded-xl border border-white/10 bg-white/5 p-3">
                   <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-white/40">
                     <span>Stop {stop.order}</span>
                     <span>{stop.scheduledAt || '시간 미정'}</span>
@@ -1019,76 +1184,94 @@ export function TravelPlanner() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_32%),linear-gradient(180deg,#050b14,#08111f)]">
-      <div className="relative flex-1 px-3 pb-3 pt-3 md:px-5 md:pb-5">
-        <div className="absolute inset-x-3 top-3 z-20 rounded-[1.75rem] border border-white/10 bg-slate-950/78 px-4 py-4 backdrop-blur md:inset-x-5 md:px-6">
-          <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                <input
-                  className="min-w-[240px] flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
-                  placeholder="장소명, lat,lng 또는 Google Maps URL 붙여넣기"
-                  value={lookupQuery}
-                  onChange={(event) => setLookupQuery(event.target.value)}
-                />
-                <Button variant="secondary" onClick={handleLookup} disabled={isResolving}>
-                  {isResolving ? '검색 중...' : '포커스 이동'}
-                </Button>
-                <Button
-                  variant={topPanelMode === 'export' ? 'primary' : 'ghost'}
-                  onClick={() => setTopPanelMode((prev) => (prev === 'export' ? null : 'export'))}
-                >
-                  Export
-                </Button>
-                <Button
-                  variant={topPanelMode === 'import' ? 'primary' : 'ghost'}
-                  onClick={() => setTopPanelMode((prev) => (prev === 'import' ? null : 'import'))}
-                >
-                  Import
-                </Button>
-                <Button
-                  variant={multiSelectMode ? 'primary' : 'ghost'}
-                  onClick={() => {
-                    if (multiSelectMode) {
-                      setMultiSelectMode(false);
-                      setSelectedPlaceIds([]);
-                      setExportResult(null);
-                    } else {
-                      setMultiSelectMode(true);
-                    }
-                  }}
-                >
-                  {multiSelectMode ? '선택 해제' : '복수 선택'}
-                </Button>
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_20%_0%,rgba(120,172,188,0.24),transparent_28%),radial-gradient(circle_at_85%_12%,rgba(175,138,92,0.18),transparent_28%),linear-gradient(180deg,#050b14,#08111f_46%,#070b10)]">
+      <div
+        className={`flex min-h-0 flex-1 flex-col gap-3 px-2.5 pb-2.5 pt-2.5 lg:grid lg:px-4 lg:pb-4 ${
+          editorMode
+            ? placesOpen
+              ? 'lg:grid-cols-[340px_minmax(0,1fr)_400px]'
+              : 'lg:grid-cols-[44px_minmax(0,1fr)_400px]'
+            : placesOpen
+              ? 'lg:grid-cols-[340px_minmax(0,1fr)]'
+              : 'lg:grid-cols-[44px_minmax(0,1fr)]'
+        }`}
+      >
+        {placesOpen ? placeGallery : collapsedPlaces}
+
+        <main className="relative order-1 min-h-[620px] overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#111820] shadow-[0_30px_72px_rgba(0,0,0,0.34)] lg:order-none lg:min-h-[780px]">
+          <div className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#071019]/80 px-3 py-3 backdrop-blur-xl md:px-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5 2xl:flex-row">
+                <div className="flex min-w-0 flex-1 overflow-hidden rounded-[1rem] border border-white/10 bg-white text-[#2d261e] shadow-[0_14px_28px_rgba(0,0,0,0.16)]">
+                  <div className="flex items-center px-3 text-[#8b6f4d]">
+                    <Search size={18} />
+                  </div>
+                  <input
+                    className="min-w-0 flex-1 bg-transparent py-2.5 pr-3 text-sm outline-none placeholder:text-[#8b8176]"
+                    placeholder="장소명, lat,lng 또는 Google Maps URL 붙여넣기"
+                    value={lookupQuery}
+                    onChange={(event) => setLookupQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        handleLookup();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLookup}
+                    disabled={isResolving}
+                    className="m-1 inline-flex items-center gap-2 rounded-[0.8rem] bg-[#2d261e] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#3b332a] disabled:opacity-55"
+                  >
+                    <MousePointer2 size={16} />
+                    {isResolving ? '검색 중' : '이동'}
+                  </button>
+                </div>
               </div>
 
               {topPanelMode === 'export' ? exportPanel : null}
               {topPanelMode === 'import' ? importPanel : null}
+            </div>
           </div>
-        </div>
 
-        {error ? (
-          <div className="absolute inset-x-3 top-[188px] z-20 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100 md:inset-x-5">
-            {error}
+          {error ? (
+            <div className="absolute inset-x-3 top-[82px] z-20 rounded-xl border border-rose-400/30 bg-rose-500/15 px-3 py-2.5 text-sm text-rose-100 backdrop-blur md:inset-x-4">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="h-[620px] pt-[92px] lg:h-full lg:min-h-[780px]">
+            <TravelMapBoard
+              places={places}
+              center={center}
+              selectedPlaceId={selectedPlaceId}
+              selectedPlaceIds={selectedPlaceIds}
+              draftPosition={draftPosition}
+              onMarkerClick={handleMarkerClick}
+              onMarkerLongPress={handleMarkerLongPress}
+              onMapPick={handleMapPick}
+              onBoundsChange={handleBoundsChange}
+              onRefresh={handleRefreshPlaces}
+            />
           </div>
+        </main>
+
+        {editorMode ? (
+          <aside className="order-2 min-h-0 overflow-hidden rounded-[1.35rem] border border-white/10 bg-slate-950/96 shadow-[0_24px_54px_rgba(0,0,0,0.32)] lg:order-none">
+            <div className="flex items-center justify-end border-b border-white/10 px-4 py-3">
+              <button
+                type="button"
+                onClick={dismissEditor}
+                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/65 hover:border-white/25 hover:text-white"
+              >
+                닫기
+              </button>
+            </div>
+            <div className="max-h-none overflow-y-auto px-4 pb-4 lg:max-h-[calc(100vh-160px)]">
+              {placeEditorPanel}
+            </div>
+          </aside>
         ) : null}
-
-        <div className="h-[calc(100vh-220px)] min-h-[720px] pt-[170px] md:pt-[170px]">
-          <TravelMapBoard
-            places={places}
-            center={center}
-            selectedPlaceId={selectedPlaceId}
-            selectedPlaceIds={selectedPlaceIds}
-            draftPosition={draftPosition}
-            floatingPanel={editorMode ? placeEditorPanel : null}
-            floatingPanelAnchor={editorAnchor}
-            onMarkerClick={handleMarkerClick}
-            onMarkerLongPress={handleMarkerLongPress}
-            onMapPick={handleMapPick}
-            onDismissPanel={dismissEditor}
-            onBoundsChange={handleBoundsChange}
-            onRefresh={handleRefreshPlaces}
-          />
-        </div>
       </div>
 
       {footerCourses}
